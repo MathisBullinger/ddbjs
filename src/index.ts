@@ -1,1 +1,1 @@
-export { DDB } from './ddb'
+export * from './ddb'
