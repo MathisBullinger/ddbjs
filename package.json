@@ -1,0 +1,25 @@
+{
+  "name": "ddb",
+  "version": "0.0.1",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MathisBullinger/ddb.git"
+  },
+  "keywords": [],
+  "author": "Mathis Bullinger",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/MathisBullinger/ddb/issues"
+  },
+  "homepage": "https://github.com/MathisBullinger/ddb#readme",
+  "devDependencies": {
+    "aws-sdk": "^2.809.0",
+    "typescript": "^4.1.3"
+  }
+}
