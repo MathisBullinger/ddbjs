@@ -18,11 +18,28 @@ type KeyValue<
   ? [SchemaValue<F[T['key']]>]
   : never
 
-export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
-  private readonly client: AWS.DynamoDB.DocumentClient
+type Item<T extends Fields> = { [K in keyof T]: SchemaValue<T[K]> }
 
-  constructor(public readonly table: string, private readonly schema: T) {
-    this.client = new AWS.DynamoDB.DocumentClient()
+export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
+  public readonly client: AWS.DynamoDB.DocumentClient
+
+  constructor(
+    public readonly table: string,
+    private readonly schema: T,
+    opts?: ConstructorParameters<typeof AWS.DynamoDB.DocumentClient>[0]
+  ) {
+    this.client = new AWS.DynamoDB.DocumentClient(opts)
+  }
+
+  public async get(...key: KeyValue<T, F>): Promise<Item<F> | undefined> {
+    const { Item } = await this.client
+      .get({
+        TableName: this.table,
+        Key: this.key(...key),
+      })
+      .promise()
+
+    return Item as any
   }
 
   private key(...v: KeyValue<T, F>) {
