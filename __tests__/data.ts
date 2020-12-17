@@ -39,3 +39,19 @@ test('get non-existent item', async () =>
   expect(await db.get('foo')).toBeUndefined())
 test('get existing item', async () =>
   expect(await db.get('bar')).toMatchObject({ id: 'bar', data: 'something' }))
+
+test('insert item', async () =>
+  expect(await db.insert({ id: 'put-test', data: 'a' })).toBeUndefined())
+
+test('insert item (overwrite)', async () =>
+  expect(await db.insert({ id: 'put-test', data: 'b' })).toBeUndefined())
+
+test('insert item (return new)', async () =>
+  expect(
+    await db.insert({ id: 'put-test', data: 'c' }).returning('NEW')
+  ).toMatchObject({ id: 'put-test', data: 'c' }))
+
+test('insert item (return old)', async () =>
+  expect(
+    await db.insert({ id: 'put-test', data: 'd' }).returning('OLD')
+  ).toMatchObject({ id: 'put-test', data: 'c' }))

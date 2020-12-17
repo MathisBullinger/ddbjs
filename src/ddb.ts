@@ -18,7 +18,51 @@ type KeyValue<
   ? [SchemaValue<F[T['key']]>]
   : never
 
-type Item<T extends Fields> = { [K in keyof T]: SchemaValue<T[K]> }
+type KeyFields<T extends Fields, K extends Key<T>> = keyof Pick<
+  T,
+  K extends CompositeKey<T> ? K[0] | K[1] : K
+>
+
+type Item<TFields extends Fields, TKey extends Key<TFields>> = {
+  [K in KeyFields<TFields, TKey>]: SchemaValue<TFields[K]>
+} &
+  {
+    [K in keyof Omit<TFields, KeyFields<TFields, TKey>>]?: SchemaValue<
+      TFields[K]
+    >
+  }
+
+interface Thenable<T = any> {
+  then(cb: (v?: T) => void): void
+}
+
+class PutChain<T = undefined> implements Thenable<T> {
+  constructor(
+    private readonly client: AWS.DynamoDB.DocumentClient,
+    private readonly params: AWS.DynamoDB.DocumentClient.PutItemInput,
+    private readonly returnValue: 'NONE' | 'OLD' | 'NEW' = 'NONE'
+  ) {}
+
+  then(cb: (v?: T) => void) {
+    this.client
+      .put({
+        ...this.params,
+        ...(this.returnValue === 'OLD' && {
+          ReturnValues: 'ALL_OLD',
+        }),
+      })
+      .promise()
+      .then(({ Attributes }) => {
+        if (this.returnValue === 'OLD') cb(Attributes as T)
+        else if (this.returnValue === 'NEW') cb(this.params.Item as T)
+        else cb()
+      })
+  }
+
+  returning(v: 'OLD' | 'NEW') {
+    return new PutChain(this.client, this.params, v)
+  }
+}
 
 export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
   public readonly client: AWS.DynamoDB.DocumentClient
@@ -31,7 +75,9 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     this.client = new AWS.DynamoDB.DocumentClient(opts)
   }
 
-  public async get(...key: KeyValue<T, F>): Promise<Item<F> | undefined> {
+  public async get(
+    ...key: KeyValue<T, F>
+  ): Promise<Item<F, T['key']> | undefined> {
     const { Item } = await this.client
       .get({
         TableName: this.table,
@@ -40,6 +86,14 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
       .promise()
 
     return Item as any
+  }
+
+  public insert(item: Item<F, T['key']>) {
+    const params: AWS.DynamoDB.DocumentClient.PutItemInput = {
+      TableName: this.table,
+      Item: item,
+    }
+    return new PutChain(this.client, params)
   }
 
   private key(...v: KeyValue<T, F>) {
