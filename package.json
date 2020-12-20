@@ -10,18 +10,18 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/MathisBullinger/ddb.git"
+    "url": "git+https://github.com/MathisBullinger/sane-ddb.git"
   },
   "keywords": [],
   "author": "Mathis Bullinger",
   "license": "ISC",
   "bugs": {
-    "url": "https://github.com/MathisBullinger/ddb/issues"
+    "url": "https://github.com/MathisBullinger/sane-ddb/issues"
   },
   "files": [
     "lib/**/*"
   ],
-  "homepage": "https://github.com/MathisBullinger/ddb#readme",
+  "homepage": "https://github.com/MathisBullinger/sane-ddb#readme",
   "devDependencies": {
     "@types/jest": "^26.0.19",
     "@types/local-dynamo": "^0.5.0",
