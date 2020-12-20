@@ -38,7 +38,7 @@ afterAll(async () => {
 test('get non-existent item', async () =>
   expect(await db.get('foo')).toBeUndefined())
 test('get existing item', async () =>
-  expect(await db.get('bar')).toMatchObject({ id: 'bar', data: 'something' }))
+  expect(await db.get('bar')).toEqual({ id: 'bar', data: 'something' }))
 
 test('insert item', async () =>
   expect(await db.insert({ id: 'put-test', data: 'a' })).toBeUndefined())
@@ -49,9 +49,57 @@ test('insert item (overwrite)', async () =>
 test('insert item (return new)', async () =>
   expect(
     await db.insert({ id: 'put-test', data: 'c' }).returning('NEW')
-  ).toMatchObject({ id: 'put-test', data: 'c' }))
+  ).toEqual({ id: 'put-test', data: 'c' }))
 
 test('insert item (return old)', async () =>
   expect(
     await db.insert({ id: 'put-test', data: 'd' }).returning('OLD')
-  ).toMatchObject({ id: 'put-test', data: 'c' }))
+  ).toEqual({ id: 'put-test', data: 'c' }))
+
+test('insert item (invalid return)', () => {
+  expect(() => db.insert({ id: 'asdf' }).returning('UPDATED_NEW')).toThrow()
+})
+
+const str = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. , / \\ - _ +`
+test('encode & decode', () => expect(DDB.decode(DDB.encode(str))).toBe(str))
+
+test('update item', async () =>
+  expect(await db.update('bar', { data: 'something else' })).toBeUndefined())
+
+test('item was updated', async () =>
+  expect(await db.get('bar')).toEqual({
+    id: 'bar',
+    data: 'something else',
+  }))
+
+test('update return OLD', async () => {
+  expect(await db.update('bar', { data: 'a' }).returning('OLD')).toEqual({
+    id: 'bar',
+    data: 'something else',
+  })
+})
+
+test('update return UPDATED_OLD', async () => {
+  expect(
+    await db.update('bar', { data: 'b' }).returning('UPDATED_OLD')
+  ).toEqual({ data: 'a' })
+})
+
+test('update return UPDATED_NEW', async () => {
+  expect(
+    await db.update('bar', { data: 'c' }).returning('UPDATED_NEW')
+  ).toEqual({ data: 'c' })
+})
+
+test('update return UPDATED_NEW', async () => {
+  expect(
+    await db.update('bar', { data: 'd' }).returning('UPDATED_NEW')
+  ).toEqual({ data: 'd' })
+})
+
+test('update return NEW', async () => {
+  expect(await db.update('bar', { data: 'e' }).returning('NEW')).toEqual({
+    id: 'bar',
+    data: 'e',
+  })
+})

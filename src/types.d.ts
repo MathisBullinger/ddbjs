@@ -24,7 +24,7 @@ type KeyValue<
 type FlatKeyValue<
   T extends Schema<F>,
   F extends Fields = Omit<T, 'key'>
-> = T extends CompositeKey<F> ? KeyValue<T, F> : KeyValue<T, F>[0]
+> = T['key'] extends CompositeKey<F> ? KeyValue<T, F> : KeyValue<T, F>[0]
 
 type KeyFields<T extends Fields, K extends Key<T>> = keyof Pick<
   T,

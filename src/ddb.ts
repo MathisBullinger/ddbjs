@@ -1,71 +1,9 @@
 import * as AWS from 'aws-sdk'
-
-export type Schema<T extends Fields> = T & { key: Key<T> }
-export type Fields = Record<string, SchemaValueType>
-type SchemaValueType = StringConstructor | NumberConstructor
-export type Key<T extends Fields> = keyof T | CompositeKey<T>
-export type CompositeKey<T extends Fields> = [hash: keyof T, sort: keyof T]
-type SchemaValue<T extends SchemaValueType> = T extends StringConstructor
-  ? string
-  : number
-
-type KeyValue<
-  T extends Schema<F>,
-  F extends Fields = Omit<T, 'key'>
-> = T['key'] extends CompositeKey<F>
-  ? [SchemaValue<F[T['key'][0]]>, SchemaValue<F[T['key'][1]]>]
-  : T['key'] extends keyof F
-  ? [SchemaValue<F[T['key']]>]
-  : never
-
-type KeyFields<T extends Fields, K extends Key<T>> = keyof Pick<
-  T,
-  K extends CompositeKey<T> ? K[0] | K[1] : K
->
-
-type Item<TFields extends Fields, TKey extends Key<TFields>> = {
-  [K in KeyFields<TFields, TKey>]: SchemaValue<TFields[K]>
-} &
-  {
-    [K in keyof Omit<TFields, KeyFields<TFields, TKey>>]?: SchemaValue<
-      TFields[K]
-    >
-  }
-
-interface Thenable<T = any> {
-  then(cb: (v?: T) => void): void
-}
-
-class PutChain<T = undefined> implements Thenable<T> {
-  constructor(
-    private readonly client: AWS.DynamoDB.DocumentClient,
-    private readonly params: AWS.DynamoDB.DocumentClient.PutItemInput,
-    private readonly returnValue: 'NONE' | 'OLD' | 'NEW' = 'NONE'
-  ) {}
-
-  then(cb: (v?: T) => void) {
-    this.client
-      .put({
-        ...this.params,
-        ...(this.returnValue === 'OLD' && {
-          ReturnValues: 'ALL_OLD',
-        }),
-      })
-      .promise()
-      .then(({ Attributes }) => {
-        if (this.returnValue === 'OLD') cb(Attributes as T)
-        else if (this.returnValue === 'NEW') cb(this.params.Item as T)
-        else cb()
-      })
-  }
-
-  returning(v: 'OLD' | 'NEW') {
-    return new PutChain(this.client, this.params, v)
-  }
-}
+import { PutChain, UpdateChain } from './chain'
 
 export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
   public readonly client: AWS.DynamoDB.DocumentClient
+  private readonly fields: F
 
   constructor(
     public readonly table: string,
@@ -73,6 +11,9 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     opts?: ConstructorParameters<typeof AWS.DynamoDB.DocumentClient>[0]
   ) {
     this.client = new AWS.DynamoDB.DocumentClient(opts)
+    this.fields = Object.fromEntries(
+      Object.entries(schema).filter(([k]) => k !== 'key')
+    ) as F
   }
 
   public async get(
@@ -93,7 +34,37 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
       TableName: this.table,
       Item: item,
     }
-    return new PutChain(this.client, params)
+    return new PutChain(this.fields, this.client, params, 'NONE')
+  }
+
+  public update(
+    key: FlatKeyValue<T, F>,
+    update: AtLeastOne<Item<F, T['key']>>
+  ) {
+    const ExpressionAttributeNames: Record<string, string> = {}
+    const ExpressionAttributeValues: Record<string, any> = {}
+    const sets: [string, string][] = []
+
+    for (const [k, v] of Object.entries(update)) {
+      const encKey = DDB.encode(k)
+      ExpressionAttributeNames[`#${encKey}`] = k
+      ExpressionAttributeValues[`:${encKey}`] = v
+      sets.push([`#${encKey}`, `:${encKey}`])
+    }
+
+    const UpdateExpression = `SET ${sets.map(v => v.join('=')).join(', ')}`
+
+    const params: AWS.DynamoDB.DocumentClient.UpdateItemInput = {
+      TableName: this.table,
+      Key: this.key(
+        ...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>)
+      ),
+      ExpressionAttributeNames,
+      ExpressionAttributeValues,
+      UpdateExpression,
+    }
+
+    return new UpdateChain(this.fields, this.client, params, 'NONE')
   }
 
   private key(...v: KeyValue<T, F>) {
@@ -103,5 +74,13 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
         : (this.schema.key as string[])
       ).map((k, i) => [k, v[i]])
     )
+  }
+
+  public static encode(v: string) {
+    return Buffer.from(v).toString('hex')
+  }
+
+  public static decode(v: string) {
+    return Buffer.from(v, 'hex').toString()
   }
 }
