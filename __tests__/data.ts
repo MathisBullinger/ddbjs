@@ -10,7 +10,11 @@ const ddbOpts = {
 }
 
 const ddb = new DynamoDB(ddbOpts)
-const db = new DDB(TableName, { key: 'id', id: String, data: String }, ddbOpts)
+const db = new DDB(
+  TableName,
+  { key: 'id', id: String, data: String, arr: [String] },
+  ddbOpts
+)
 
 beforeAll(async () => {
   localDynamo.launch(undefined, 4567)
@@ -102,4 +106,10 @@ test('update return NEW', async () => {
     id: 'bar',
     data: 'e',
   })
+})
+
+test('insert string set', async () => {
+  const item = { id: 'strset', arr: ['a'] } as const
+  await expect(db.insert(item)).resolves.not.toThrow()
+  await expect(db.get(item.id)).resolves.toEqual(item)
 })

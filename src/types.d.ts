@@ -1,16 +1,39 @@
-type Schema<T extends Fields> = T & { key: Key<T> }
+type Schema<T extends Fields> = T & Readonly<{ key: Key<T> }>
 
-type Fields = Record<string, SchemaValueType>
+type Fields = Readonly<Record<string, SchemaValueType>>
 
-type SchemaValueType = StringConstructor | NumberConstructor
+type NonEmpty<T> = [T, ...T[]]
 
-type Key<T extends Fields> = keyof T | CompositeKey<T>
+type PrimitiveConstructor = StringConstructor | NumberConstructor
 
-type CompositeKey<T extends Fields> = [hash: keyof T, sort: keyof T]
+type SchemaValueType =
+  | PrimitiveConstructor
+  | StringConstructor[]
+  | NumberConstructor[]
 
-type SchemaValue<T extends SchemaValueType> = T extends StringConstructor
-  ? string
-  : number
+type PrimitiveKeys<T extends Fields> = {
+  [K in keyof T]: T[K] extends Function ? K : never
+}[keyof T]
+type PrimitiveFields<T extends Fields> = Pick<T, PrimitiveKeys<T>>
+
+type Foo = PrimitiveFields<{ foo: StringConstructor; bar: NumberConstructor[] }>
+
+type Key<T extends Fields> = keyof PrimitiveFields<T> | CompositeKey<T>
+
+type CompositeKey<R extends Fields, T extends Fields = PrimitiveFields<R>> = [
+  hash: keyof T,
+  sort: keyof T
+]
+
+type PrimitiveConstructorValue<
+  T extends PrimitiveConstructor
+> = T extends StringConstructor ? string : number
+
+type SchemaValue<T extends SchemaValueType> = T extends PrimitiveConstructor
+  ? PrimitiveConstructorValue<T>
+  : T extends any[]
+  ? Readonly<NonEmpty<PrimitiveConstructorValue<T[number]>>>
+  : never
 
 type KeyValue<
   T extends Schema<F>,
