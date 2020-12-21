@@ -1,5 +1,6 @@
 import * as AWS from 'aws-sdk'
 import { PutChain, UpdateChain } from './chain'
+import { ValidationError } from './utils/error'
 
 export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
   public readonly client: AWS.DynamoDB.DocumentClient
@@ -30,6 +31,7 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
   }
 
   public insert(item: Item<F, T['key']>) {
+    this.validate(item)
     const params: AWS.DynamoDB.DocumentClient.PutItemInput = {
       TableName: this.table,
       Item: item,
@@ -39,11 +41,17 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
 
   public update(
     key: FlatKeyValue<T, F>,
-    update: AtLeastOne<Item<F, T['key']>>
+    update: AtLeastOne<Omit<Item<F, T['key']>, KeyFields<F, T['key']>>>
   ) {
+    this.validate(update as any)
+
     const ExpressionAttributeNames: Record<string, string> = {}
     const ExpressionAttributeValues: Record<string, any> = {}
     const sets: [string, string][] = []
+
+    const Key = this.key(
+      ...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>)
+    )
 
     for (const [k, v] of Object.entries(update)) {
       const encKey = DDB.encode(k)
@@ -56,15 +64,21 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
 
     const params: AWS.DynamoDB.DocumentClient.UpdateItemInput = {
       TableName: this.table,
-      Key: this.key(
-        ...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>)
-      ),
+      Key,
       ExpressionAttributeNames,
       ExpressionAttributeValues,
       UpdateExpression,
     }
 
     return new UpdateChain(this.fields, this.client, params, 'NONE')
+  }
+
+  public static encode(v: string) {
+    return Buffer.from(v).toString('hex')
+  }
+
+  public static decode(v: string) {
+    return Buffer.from(v, 'hex').toString()
   }
 
   private key(...v: KeyValue<T, F>) {
@@ -76,11 +90,10 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     )
   }
 
-  public static encode(v: string) {
-    return Buffer.from(v).toString('hex')
-  }
-
-  public static decode(v: string) {
-    return Buffer.from(v, 'hex').toString()
+  private validate(item: Partial<Item<F, T['key']>>) {
+    for (const [k, v] of Object.entries(item)) {
+      if (Array.isArray(v) && v.length === 0)
+        throw new ValidationError(`attribute '${k}' can't contain an empty set`)
+    }
   }
 }

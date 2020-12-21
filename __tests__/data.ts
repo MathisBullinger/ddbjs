@@ -12,7 +12,7 @@ const ddbOpts = {
 const ddb = new DynamoDB(ddbOpts)
 const db = new DDB(
   TableName,
-  { key: 'id', id: String, data: String, arr: [String] },
+  { key: 'id', id: String, data: String, strset: [String], list: [] },
   ddbOpts
 )
 
@@ -108,8 +108,33 @@ test('update return NEW', async () => {
   })
 })
 
+test('update if exists', async () => {
+  const id = `id-${Date.now()}`
+  expect(db.update(id, { data: 'foo' }).returning('NEW')).resolves.toEqual({
+    id,
+    data: 'foo',
+  })
+
+  await expect(
+    db.update(`${id}-b`, { data: 'bar' }).ifExists()
+  ).rejects.toThrow()
+
+  expect(
+    db.update(id, { data: 'bar' }).ifExists().returning('UPDATED_NEW')
+  ).resolves.toEqual({ data: 'bar' })
+})
+
 test('insert string set', async () => {
-  const item = { id: 'strset', arr: ['a'] } as const
-  await expect(db.insert(item)).resolves.not.toThrow()
+  const item = { id: 'strset', strset: ['a', 2] } as const
+  // @ts-ignore
+  await db.insert(item)
   await expect(db.get(item.id)).resolves.toEqual(item)
+})
+
+test("can't insert empty set", async () => {
+  // @ts-ignore
+  expect(() => db.insert({ id: 'emptyset', strset: [] })).toThrow()
+  await db.insert({ id: 'emptyset', strset: ['a', 'b'] })
+  // @ts-ignore
+  expect(() => db.update('emptyset', { strset: [] })).toThrow()
 })

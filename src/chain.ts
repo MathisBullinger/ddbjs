@@ -2,7 +2,7 @@ import { oneOf } from './utils/array'
 import { assert, ReturnValueError } from './utils/error'
 
 interface Thenable<T = any> {
-  then(cb: (v?: T) => void): void
+  then(cb: (v?: T) => void, rej?: (reason?: any) => void): void
 }
 type ThenCB<T> = Parameters<Thenable<T>['then']>[0]
 type ReturnType = 'NONE' | 'NEW' | 'OLD' | 'UPDATED_OLD' | 'UPDATED_NEW'
@@ -20,7 +20,7 @@ abstract class Chain<
     protected readonly returnType: TReturn
   ) {}
 
-  public abstract then(cb: ThenCB<TResult>): void
+  public abstract then(cb: ThenCB<TResult>, rej?: (reason?: any) => void): void
 }
 
 export class PutChain<
@@ -37,8 +37,8 @@ export class PutChain<
     super(fields, client, returnType)
   }
 
-  then(cb: ThenCB<T3>) {
-    this.client
+  then(cb: ThenCB<T3>, reject: (reason: any) => void = () => {}) {
+    return this.client
       .put({
         ...this.params,
         ...(this.returnType === 'OLD' && {
@@ -51,6 +51,7 @@ export class PutChain<
         else if (this.returnType === 'OLD') cb(Attributes as T3)
         else cb()
       })
+      .catch(reject)
   }
 
   returning<T extends ReturnType>(v: T): PutChain<T1, T> {
@@ -73,22 +74,36 @@ export class UpdateChain<
     super(fields, client, returnType)
   }
 
-  then(cb: ThenCB<T3>) {
+  then(cb: ThenCB<T3>, reject: (reason: any) => void = () => {}) {
     const params = this.params
     if (this.returnType.startsWith('UPDATED_'))
       this.params.ReturnValues = this.returnType
     else if (this.returnType !== 'NONE')
       this.params.ReturnValues = `ALL_${this.returnType}`
-    this.client
+    return this.client
       .update(params)
       .promise()
       .then(({ Attributes }) => {
         if (this.returnType !== 'NONE') cb(Attributes as T3)
         else cb()
       })
+      .catch(reject)
   }
 
   returning<T extends ReturnType>(v: T): UpdateChain<T1, T> {
     return new UpdateChain(this.fields, this.client, this.params, v)
+  }
+
+  ifExists(): UpdateChain<T1, T2, T3> {
+    const params = { ExpressionAttributeValues: {}, ...this.params }
+
+    params.ConditionExpression = Object.entries(params.Key)
+      .map(([k, v]) => {
+        params.ExpressionAttributeValues[`:${k}`] = v
+        return `${k}=:${k}`
+      })
+      .join(' AND ')
+
+    return new UpdateChain(this.fields, this.client, params, this.returnType)
   }
 }

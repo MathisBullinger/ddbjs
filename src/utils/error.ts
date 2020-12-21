@@ -10,3 +10,7 @@ export class ReturnValueError extends Error {
     super(`invalid return value '${value}' for ${op} operation`)
   }
 }
+
+export class ValidationError extends Error {
+  public readonly name = 'ValidationError'
+}
