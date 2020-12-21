@@ -39,10 +39,14 @@ afterAll(async () => {
   await ddb.deleteTable({ TableName }).promise()
 })
 
+// get
+
 test('get non-existent item', async () =>
   expect(await db.get('foo')).toBeUndefined())
 test('get existing item', async () =>
   expect(await db.get('bar')).toEqual({ id: 'bar', data: 'something' }))
+
+// insert
 
 test('insert item', async () =>
   expect(await db.insert({ id: 'put-test', data: 'a' })).toBeUndefined())
@@ -64,8 +68,7 @@ test('insert item (invalid return)', () => {
   expect(() => db.insert({ id: 'asdf' }).returning('UPDATED_NEW')).toThrow()
 })
 
-const str = `Lorem ipsum dolor sit amet, consectetur adipiscing elit. , / \\ - _ +`
-test('encode & decode', () => expect(DDB.decode(DDB.encode(str))).toBe(str))
+// update
 
 test('update item', async () =>
   expect(await db.update('bar', { data: 'something else' })).toBeUndefined())
@@ -124,11 +127,24 @@ test('update if exists', async () => {
   ).resolves.toEqual({ data: 'bar' })
 })
 
+// sets & lists
+
 test('insert string set', async () => {
-  const item = { id: 'strset', strset: ['a', 2] } as const
-  // @ts-ignore
+  const item = { id: 'strset', strset: ['a', 'b'] } as const
   await db.insert(item)
   await expect(db.get(item.id)).resolves.toEqual(item)
+})
+
+test("can't insert duplicate in set", async () => {
+  await expect(
+    db.insert({ id: 'dupset', strset: ['a', 'a'] })
+  ).rejects.toThrow()
+})
+
+test("can't insert different types in set", async () => {
+  await expect(
+    db.insert({ id: 'mixset', strset: ['a', 2] } as any)
+  ).rejects.toThrow()
 })
 
 test("can't insert empty set", async () => {
@@ -137,4 +153,24 @@ test("can't insert empty set", async () => {
   await db.insert({ id: 'emptyset', strset: ['a', 'b'] })
   // @ts-ignore
   expect(() => db.update('emptyset', { strset: [] })).toThrow()
+})
+
+test('can insert empty list', async () => {
+  expect(await db.insert({ id: 'list', list: [] })).toBeUndefined()
+  expect(await db.get('list')).toEqual({ id: 'list', list: [] })
+})
+
+test('explicit Set', async () => {
+  await expect(
+    db.insert({ id: 'expset', explset: ['a'] }, { explset: 'Set' })
+  ).resolves.not.toThrow()
+  await expect(
+    db.update('expset', { explset: ['a', 'a'] }, { explset: 'Set' })
+  ).rejects.toThrow()
+})
+
+test('explicit List', async () => {
+  await expect(
+    db.insert({ id: 'explist', strset: ['a', 2] } as any, { strset: 'List' })
+  ).resolves.not.toThrow()
 })

@@ -8,10 +8,12 @@ This library provides a friendlier API for DynamoDB.
 npm install idb
 ```
 
-Then import like this:
+Then, using a bundler like Webpack or Rollup, import like this:
 
-```
+```js
 import { DDB } from 'sane-ddb'
+
+const db = new DDB(…)
 ```
 
 # API

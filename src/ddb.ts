@@ -40,8 +40,19 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     return Item as any
   }
 
-  public insert(item: Item<F, T['key']>) {
+  public insert<I extends Item<F, T['key']>>(item: I, types?: ExplTypes<I>) {
     this.validate(item)
+
+    const keys = Object.keys(item) as (keyof Item<F, T['key']>)[]
+    for (const k of keys)
+      if (
+        (this.isSet(k as string) && types?.[k] !== 'List') ||
+        types?.[k] === 'Set'
+      )
+        item[k as keyof Item<F, T['key']>] = this.createSet(
+          item[k] as any
+        ) as any
+
     const params: AWS.DynamoDB.DocumentClient.PutItemInput = {
       TableName: this.table,
       Item: item,
@@ -49,9 +60,10 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     return new PutChain(this.fields, this.client, params, 'NONE')
   }
 
-  public update(
+  public update<U extends ItemUpdate<T, F>>(
     key: FlatKeyValue<T, F>,
-    update: AtLeastOne<Omit<Item<F, T['key']>, KeyFields<F, T['key']>>>
+    update: NotEmptyObj<U>,
+    types?: ExplTypes<U>
   ) {
     this.validate(update as any)
 
@@ -66,7 +78,12 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     for (const [k, v] of Object.entries(update)) {
       const encKey = DDB.encode(k)
       ExpressionAttributeNames[`#${encKey}`] = k
-      ExpressionAttributeValues[`:${encKey}`] = v
+      if (
+        (this.isSet(k) && types?.[k as keyof U] !== 'List') ||
+        types?.[k as keyof U] === 'Set'
+      )
+        ExpressionAttributeValues[`:${encKey}`] = this.createSet(v as any)
+      else ExpressionAttributeValues[`:${encKey}`] = v
       sets.push([`#${encKey}`, `:${encKey}`])
     }
 
@@ -102,8 +119,19 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
 
   private validate(item: Partial<Item<F, T['key']>>) {
     for (const [k, v] of Object.entries(item)) {
-      if (Array.isArray(v) && v.length === 0)
+      if (this.isSet(k) && (!Array.isArray(v) || v.length === 0))
         throw new ValidationError(`attribute '${k}' can't contain an empty set`)
     }
+  }
+
+  private isSet(attr: string): boolean {
+    const type = this.schema[attr]
+    return Array.isArray(type) && [String, Number].includes(type[0] as any)
+  }
+
+  private createSet(
+    items: string[] | number[]
+  ): AWS.DynamoDB.DocumentClient.DynamoDbSet {
+    return this.client.createSet(items)
   }
 }

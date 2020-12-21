@@ -2,21 +2,18 @@ type Schema<T extends Fields> = T & Readonly<{ key: Key<T> }>
 
 type Fields = Readonly<Record<string, SchemaValueType>>
 
-type NonEmpty<T> = [T, ...T[]]
-
 type PrimitiveConstructor = StringConstructor | NumberConstructor
 
 type SchemaValueType =
   | PrimitiveConstructor
-  | StringConstructor[]
-  | NumberConstructor[]
+  | [StringConstructor]
+  | [NumberConstructor]
+  | []
 
 type PrimitiveKeys<T extends Fields> = {
   [K in keyof T]: T[K] extends Function ? K : never
 }[keyof T]
 type PrimitiveFields<T extends Fields> = Pick<T, PrimitiveKeys<T>>
-
-type Foo = PrimitiveFields<{ foo: StringConstructor; bar: NumberConstructor[] }>
 
 type Key<T extends Fields> = keyof PrimitiveFields<T> | CompositeKey<T>
 
@@ -25,14 +22,12 @@ type CompositeKey<R extends Fields, T extends Fields = PrimitiveFields<R>> = [
   sort: keyof T
 ]
 
-type PrimitiveConstructorValue<
-  T extends PrimitiveConstructor
-> = T extends StringConstructor ? string : number
-
 type SchemaValue<T extends SchemaValueType> = T extends PrimitiveConstructor
-  ? PrimitiveConstructorValue<T>
+  ? PrimitiveConstructorType<T>
+  : T extends []
+  ? any[]
   : T extends any[]
-  ? Readonly<NonEmpty<PrimitiveConstructorValue<T[number]>>>
+  ? Readonly<NonEmpty<PrimitiveConstructorType<T[number]>>>
   : never
 
 type KeyValue<
@@ -63,6 +58,15 @@ type Item<TFields extends Fields, TKey extends Key<TFields>> = {
     >
   }
 
+type ItemUpdate<
+  T extends Schema<F>,
+  F extends Fields = Omit<T, 'key'>
+> = Record<string, any> & Omit<Item<F, T['key']>, KeyFields<F, T['key']>>
+
+// generic helper types
+
+type NonEmpty<T> = [T, ...T[]]
+
 type AtLeastOne<T, Keys extends keyof T = keyof T> = Pick<
   T,
   Exclude<keyof T, Keys>
@@ -70,3 +74,15 @@ type AtLeastOne<T, Keys extends keyof T = keyof T> = Pick<
   {
     [K in Keys]-?: Required<Pick<T, K>> & Partial<Pick<T, Exclude<Keys, K>>>
   }[Keys]
+
+type NotEmptyObj<T extends Record<string, any>> = keyof T extends never
+  ? never
+  : T
+
+type PrimitiveConstructorType<
+  T extends PrimitiveConstructor
+> = T extends StringConstructor ? string : number
+
+type ExplTypes<T extends Record<string, any>> = {
+  [K in keyof T]?: 'Set' | 'List'
+}
