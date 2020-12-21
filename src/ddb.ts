@@ -6,12 +6,22 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
   public readonly client: AWS.DynamoDB.DocumentClient
   private readonly fields: F
 
+  /**
+   * @example
+   * new DDB('users', {
+   *   key: 'id', id: String, name: String, tags: [Number]
+   * })
+   *
+   * @param table table name
+   * @param schema Schema of the table. Must include the key.
+   * @param opts parameters passed to DynamoDB document client
+   */
   constructor(
     public readonly table: string,
     private readonly schema: T,
-    opts?: ConstructorParameters<typeof AWS.DynamoDB.DocumentClient>[0]
+    params?: ConstructorParameters<typeof AWS.DynamoDB.DocumentClient>[0]
   ) {
-    this.client = new AWS.DynamoDB.DocumentClient(opts)
+    this.client = new AWS.DynamoDB.DocumentClient(params)
     this.fields = Object.fromEntries(
       Object.entries(schema).filter(([k]) => k !== 'key')
     ) as F
