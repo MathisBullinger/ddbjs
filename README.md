@@ -49,6 +49,14 @@ The [DynamoDB data types](https://docs.aws.amazon.com/amazondynamodb/latest/deve
 
 You must declare sets in the schema, otherwise when you insert an array it is assumed to be a list.
 
+### Casting List <-> Set
+
+If you want to insert/update an attribute as a set that hasn't been declared in the schema as such or insert/update an attribute as a list that has been declared a set in the schema, you can chain `.cast()` after the `.put()` and `.update()` methods to override its type:
+
+```js
+db.update('id', { someSet: ['a', 'b'] }).cast({ someSet: 'Set' })
+```
+
 ### Examples
 
 _A users table that uses the `id` attribute as partition key:_
@@ -78,23 +86,39 @@ _A table that uses key (`pk` as partition key and `sk` as sort key`):_
 Gets an item by its key.
 
 ```js
-const user = await ddb.get(123)
+const user = await db.get(123)
 
 // with a composite key
-const data = await ddb.get('foo', 'bar') // hash: 'foo', sort: 'bar'
+const data = await db.get('foo', 'bar') // hash: 'foo', sort: 'bar'
 ```
 
-## `insert`
+## `put`
 
 Writes an item to the database. The key attributes must be specified.
 
 ```js
-await ddb.insert({ id: 'foo', name: 'john' })
+await db.put({ id: 'foo', name: 'john' })
 
 // The inserted item or (in case of overwrite) old item can be returned
 // by chaining `.returning()`. Valid arguments are 'NEW' and 'OLD'.
-const oldUser = await ddb.insert({ id: 'foo', name: 'jane' }).returning('OLD')
+const oldUser = await db.put({ id: 'foo', name: 'jane' }).returning('OLD')
 console.log(oldUser) //> { id: 'foo', name: 'john' }
+```
+
+## `delete`
+
+Deletes an item from the database by its key.
+
+```js
+await db.delete('foo')
+
+// delete with composite key
+await db.delete('hash', 'sort')
+
+// return deleted item
+await db.put({ id: 'foo', name: 'john' })
+const user = await db.delete('foo').returning('OLD')
+console.log(user) //> { id: 'foo', name: 'john' }
 ```
 
 ## `update`
@@ -102,16 +126,16 @@ console.log(oldUser) //> { id: 'foo', name: 'john' }
 Update an existing item. By default, if the key does not yet exist, it writes a new item to the database. You can not include the key parameters in the updated fields.
 
 ```js
-await ddb.update('asdf', { name: 'foo' })
+await db.update('asdf', { name: 'foo' })
 
 // Chain `.returning()` to receive the old or updated item.
 // Valid arguments are 'NEW', 'OLD', 'UPDATED_NEW', and 'UPDATED_OLD'.
-const oldName = await ddb.update('asdf', { name: 'bar' }).returning('UPDATED_OLD')
+const oldName = await db.update('asdf', { name: 'bar' }).returning('UPDATED_OLD')
 console.log(oldName) //> { name: 'foo' }
 
 // Chain `.ifExists()` to prevent creating a new item if the key doesn't exist.
-await ddb.update('new_key', { name: 'foo' }).ifExists() // throws error
+await db.update('new_key', { name: 'foo' }).ifExists() // throws error
 
 // with composite key
-await ddb.update(['hash', 'sort'], { data: '…' })
+await db.update(['hash', 'sort'], { data: '…' })
 ```

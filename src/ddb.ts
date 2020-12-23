@@ -1,5 +1,5 @@
 import * as AWS from 'aws-sdk'
-import { PutChain, UpdateChain } from './chain'
+import { PutChain, DeletionChain, UpdateChain } from './chain'
 import { decode } from './utils/convert'
 
 export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
@@ -42,12 +42,20 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     return decode(Item) as Item<F, T['key']>
   }
 
-  public insert<I extends Item<F, T['key']>>(item: I) {
+  public put<I extends Item<F, T['key']>>(item: I) {
     const params: AWS.DynamoDB.DocumentClient.PutItemInput = {
       TableName: this.table,
       Item: item,
     }
     return new PutChain(this.fields, this.client, params, 'NONE')
+  }
+
+  public delete(...key: KeyValue<T, F>) {
+    const params: AWS.DynamoDB.DocumentClient.DeleteItemInput = {
+      TableName: this.table,
+      Key: this.key(...key),
+    }
+    return new DeletionChain(this.fields, this.client, params, 'NONE')
   }
 
   public update<U extends ItemUpdate<T, F>>(

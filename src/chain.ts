@@ -15,6 +15,7 @@ type Item<T extends Fields> = { [K in keyof T]: SchemaValue<T[K]> }
 type Input =
   | AWS.DynamoDB.DocumentClient.PutItemInput
   | AWS.DynamoDB.DocumentClient.UpdateItemInput
+  | AWS.DynamoDB.DocumentClient.DeleteItemInput
 
 abstract class Chain<
   TFields extends Fields,
@@ -30,7 +31,7 @@ abstract class Chain<
 
   public abstract then(cb: ThenCB<TResult>, rej?: (reason?: any) => void): void
 
-  protected clone(fields: TFields = this.fields) {
+  protected clone(fields: TFields = this.fields): this {
     return new (<any>this).constructor(
       fields,
       this.client,
@@ -68,28 +69,36 @@ abstract class Chain<
     return encoded as T
   }
 
-  protected compile() {
-    if (this.params.ExpressionAttributeValues) {
-      const translation = Bimap.from(
-        mapKeys(this.params.ExpressionAttributeNames as any, k =>
-          (k as string).replace(/^#/, ':')
+  protected compile(reject?: (error: Error) => void): boolean {
+    try {
+      if (this.params.ExpressionAttributeValues) {
+        const translation = Bimap.from(
+          mapKeys(this.params.ExpressionAttributeNames as any, k =>
+            (k as string).replace(/^#/, ':')
+          )
         )
-      )
 
-      this.params.ExpressionAttributeValues = {
-        ...this.params.ExpressionAttributeValues,
-        ...mapKeys(
-          this.encode(
-            mapKeys(
-              this.params.ExpressionAttributeValues as any,
-              k => translation.left[k as string]
-            )
+        this.params.ExpressionAttributeValues = {
+          ...this.params.ExpressionAttributeValues,
+          ...mapKeys(
+            this.encode(
+              mapKeys(
+                this.params.ExpressionAttributeValues as any,
+                k => translation.left[k as string]
+              )
+            ),
+            k => translation.right[k as string]
           ),
-          k => translation.right[k as string]
-        ),
+        }
       }
+      if ('Item' in this.params)
+        this.params.Item = this.encode(this.params.Item)
+    } catch (e) {
+      if (reject) reject(e)
+      else throw e
+      return false
     }
-    if ('Item' in this.params) this.params.Item = this.encode(this.params.Item)
+    return true
   }
 }
 
@@ -108,11 +117,7 @@ export class PutChain<
   }
 
   then(resolve: ThenCB<T3>, reject: (reason: any) => void = () => {}) {
-    try {
-      this.compile()
-    } catch (e) {
-      return void reject(e)
-    }
+    if (!this.compile(reject)) return
     return this.client
       .put({
         ...this.params,
@@ -135,6 +140,43 @@ export class PutChain<
   }
 }
 
+export class DeletionChain<
+  T1 extends Fields,
+  T2 extends ReturnType = 'NONE',
+  T3 = T2 extends 'NONE' ? undefined : Item<T1>
+> extends Chain<T1, T2, T3> {
+  constructor(
+    fields: T1,
+    client: AWS.DynamoDB.DocumentClient,
+    protected readonly params: AWS.DynamoDB.DocumentClient.DeleteItemInput,
+    returnType: T2
+  ) {
+    super(fields, client, params, returnType)
+  }
+
+  then(resolve: ThenCB<T3>, reject: (reason: any) => void = () => {}) {
+    if (!this.compile(reject)) return
+    return this.client
+      .delete({
+        ...this.params,
+        ...(this.returnType === 'OLD' && {
+          ReturnValues: 'ALL_OLD',
+        }),
+      })
+      .promise()
+      .then(({ Attributes }) => {
+        if (this.returnType === 'OLD') resolve(Attributes as T3)
+        else resolve()
+      })
+      .catch(reject)
+  }
+
+  returning<T extends ReturnType>(v: T): DeletionChain<T1, T> {
+    assert(oneOf(v, 'OLD', 'NONE'), new ReturnValueError(v, 'delete'))
+    return new DeletionChain(this.fields, this.client, this.params, v)
+  }
+}
+
 export class UpdateChain<
   T1 extends Fields,
   T2 extends ReturnType = 'NONE',
@@ -150,11 +192,7 @@ export class UpdateChain<
   }
 
   then(resolve: ThenCB<T3>, reject: (reason: any) => void = () => {}) {
-    try {
-      this.compile()
-    } catch (e) {
-      return void reject(e)
-    }
+    if (!this.compile(reject)) return
     const params = this.params
     if (this.returnType.startsWith('UPDATED_'))
       this.params.ReturnValues = this.returnType
