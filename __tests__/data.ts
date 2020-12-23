@@ -131,7 +131,7 @@ test('update if exists', async () => {
 
 test('insert string set', async () => {
   const item = { id: 'strset', strset: ['a', 'b'] } as const
-  await db.insert(item)
+  await expect(db.insert(item).returning('NEW')).resolves.toEqual(item)
   await expect(db.get(item.id)).resolves.toEqual(item)
 })
 
@@ -149,10 +149,10 @@ test("can't insert different types in set", async () => {
 
 test("can't insert empty set", async () => {
   // @ts-ignore
-  expect(() => db.insert({ id: 'emptyset', strset: [] })).toThrow()
+  expect(db.insert({ id: 'emptyset', strset: [] })).rejects.toThrow()
   await db.insert({ id: 'emptyset', strset: ['a', 'b'] })
   // @ts-ignore
-  expect(() => db.update('emptyset', { strset: [] })).toThrow()
+  expect(db.update('emptyset', { strset: [] })).rejects.toThrow()
 })
 
 test('can insert empty list', async () => {
@@ -162,15 +162,23 @@ test('can insert empty list', async () => {
 
 test('explicit Set', async () => {
   await expect(
-    db.insert({ id: 'expset', explset: ['a'] }, { explset: 'Set' })
+    db.insert({ id: 'expset', explset: ['a'] }).cast({ explset: 'Set' })
   ).resolves.not.toThrow()
   await expect(
-    db.update('expset', { explset: ['a', 'a'] }, { explset: 'Set' })
+    db.update('expset', { explset: ['a', 'a'] }).cast({ explset: 'Set' })
+  ).rejects.toThrow()
+  await expect(
+    db.insert({ id: 'expset2', explset: ['a', 'a'] }).cast({ explset: 'Set' })
   ).rejects.toThrow()
 })
 
 test('explicit List', async () => {
   await expect(
-    db.insert({ id: 'explist', strset: ['a', 2] } as any, { strset: 'List' })
+    db
+      .insert({ id: 'explist', strset: ['a', 2] } as any)
+      .cast({ strset: 'List' })
   ).resolves.not.toThrow()
+  await expect(
+    db.insert({ id: 'explist', strset: ['a', 2] } as any)
+  ).rejects.toThrow()
 })

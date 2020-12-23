@@ -94,7 +94,7 @@ await ddb.insert({ id: 'foo', name: 'john' })
 // The inserted item or (in case of overwrite) old item can be returned
 // by chaining `.returning()`. Valid arguments are 'NEW' and 'OLD'.
 const oldUser = await ddb.insert({ id: 'foo', name: 'jane' }).returning('OLD')
-console.log(oldUser) // > { id: 'foo', name: 'john' }
+console.log(oldUser) //> { id: 'foo', name: 'john' }
 ```
 
 ## `update`
@@ -107,7 +107,7 @@ await ddb.update('asdf', { name: 'foo' })
 // Chain `.returning()` to receive the old or updated item.
 // Valid arguments are 'NEW', 'OLD', 'UPDATED_NEW', and 'UPDATED_OLD'.
 const oldName = await ddb.update('asdf', { name: 'bar' }).returning('UPDATED_OLD')
-console.log(oldName) // > { name: 'foo' }
+console.log(oldName) //> { name: 'foo' }
 
 // Chain `.ifExists()` to prevent creating a new item if the key doesn't exist.
 await ddb.update('new_key', { name: 'foo' }).ifExists() // throws error

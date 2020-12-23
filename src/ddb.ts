@@ -1,6 +1,6 @@
 import * as AWS from 'aws-sdk'
 import { PutChain, UpdateChain } from './chain'
-import { ValidationError } from './utils/error'
+import { decode } from './utils/convert'
 
 export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
   public readonly client: AWS.DynamoDB.DocumentClient
@@ -37,22 +37,12 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
       })
       .promise()
 
-    return Item as any
+    if (!Item) return
+
+    return decode(Item) as Item<F, T['key']>
   }
 
-  public insert<I extends Item<F, T['key']>>(item: I, types?: ExplTypes<I>) {
-    this.validate(item)
-
-    const keys = Object.keys(item) as (keyof Item<F, T['key']>)[]
-    for (const k of keys)
-      if (
-        (this.isSet(k as string) && types?.[k] !== 'List') ||
-        types?.[k] === 'Set'
-      )
-        item[k as keyof Item<F, T['key']>] = this.createSet(
-          item[k] as any
-        ) as any
-
+  public insert<I extends Item<F, T['key']>>(item: I) {
     const params: AWS.DynamoDB.DocumentClient.PutItemInput = {
       TableName: this.table,
       Item: item,
@@ -62,11 +52,8 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
 
   public update<U extends ItemUpdate<T, F>>(
     key: FlatKeyValue<T, F>,
-    update: NotEmptyObj<U>,
-    types?: ExplTypes<U>
+    update: NotEmptyObj<U>
   ) {
-    this.validate(update as any)
-
     const ExpressionAttributeNames: Record<string, string> = {}
     const ExpressionAttributeValues: Record<string, any> = {}
     const sets: [string, string][] = []
@@ -78,12 +65,7 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     for (const [k, v] of Object.entries(update)) {
       const encKey = DDB.encode(k)
       ExpressionAttributeNames[`#${encKey}`] = k
-      if (
-        (this.isSet(k) && types?.[k as keyof U] !== 'List') ||
-        types?.[k as keyof U] === 'Set'
-      )
-        ExpressionAttributeValues[`:${encKey}`] = this.createSet(v as any)
-      else ExpressionAttributeValues[`:${encKey}`] = v
+      ExpressionAttributeValues[`:${encKey}`] = v
       sets.push([`#${encKey}`, `:${encKey}`])
     }
 
@@ -115,23 +97,5 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
         : (this.schema.key as string[])
       ).map((k, i) => [k, v[i]])
     )
-  }
-
-  private validate(item: Partial<Item<F, T['key']>>) {
-    for (const [k, v] of Object.entries(item)) {
-      if (this.isSet(k) && (!Array.isArray(v) || v.length === 0))
-        throw new ValidationError(`attribute '${k}' can't contain an empty set`)
-    }
-  }
-
-  private isSet(attr: string): boolean {
-    const type = this.schema[attr]
-    return Array.isArray(type) && [String, Number].includes(type[0] as any)
-  }
-
-  private createSet(
-    items: string[] | number[]
-  ): AWS.DynamoDB.DocumentClient.DynamoDbSet {
-    return this.client.createSet(items)
   }
 }
