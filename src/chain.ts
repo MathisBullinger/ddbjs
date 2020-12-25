@@ -242,6 +242,17 @@ export class UpdateChain<
     )
   }
 
+  remove(
+    ...attrs: NonNullable<UpdateInput<T0, T1>['remove']>
+  ): UpdateChain<T0, T1, T2, T3> {
+    return new UpdateChain(
+      this.fields,
+      this.client,
+      { ...this.update, remove: [...(this.update.remove ?? []), ...attrs] },
+      this.returnType
+    )
+  }
+
   private buildParams(): AWS.DynamoDB.DocumentClient.UpdateItemInput {
     const ExpressionAttributeNames: Record<string, string> = {}
     const ExpressionAttributeValues: Record<string, any> = {}

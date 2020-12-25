@@ -60,10 +60,10 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
 
   public update<U extends ItemUpdate<T, F>>(
     key: FlatKeyValue<T, F>,
-    update: NotEmptyObj<U>
+    update?: U
   ) {
-    const remove = update.$remove
-    delete update.$remove
+    const remove = update?.$remove
+    delete update?.$remove
     const input: UpdateInput<T, F> = {
       set: update,
       remove,

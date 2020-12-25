@@ -157,13 +157,22 @@ test('update if exists', async () => {
 })
 
 test('delete attribute', async () => {
-  const obj = { id: ranId(), foo: 'bar', x: 'x' }
+  const obj: any = { id: ranId(), foo: 'bar', x: 'x' }
   await db.put(obj)
-  // @ts-ignore
   delete obj.x
   await expect(
     db.update(obj.id, { $remove: ['x'] }).returning('NEW')
   ).resolves.toEqual(obj)
+  await expect(db.get(obj.id)).resolves.toEqual(obj)
+
+  obj.y = 'y'
+  await expect(db.update(obj.id, { y: 'y' }).returning('NEW')).resolves.toEqual(
+    obj
+  )
+  delete obj.y
+  await expect(db.update(obj.id).remove('y').returning('NEW')).resolves.toEqual(
+    obj
+  )
   await expect(db.get(obj.id)).resolves.toEqual(obj)
 })
 
