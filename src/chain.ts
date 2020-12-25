@@ -25,7 +25,7 @@ abstract class Chain<
   constructor(
     protected readonly fields: TFields,
     protected readonly client: AWS.DynamoDB.DocumentClient,
-    protected readonly params: Input,
+    protected readonly params: Input | undefined,
     protected readonly returnType: TReturn
   ) {}
 
@@ -69,8 +69,17 @@ abstract class Chain<
     return encoded as T
   }
 
+  protected static encodeKey(v: string) {
+    return Buffer.from(v).toString('hex')
+  }
+
+  protected static decodeKey(v: string) {
+    return Buffer.from(v, 'hex').toString()
+  }
+
   protected compile(reject?: (error: Error) => void): boolean {
     try {
+      if (!this.params) throw Error('params not specified')
       if (this.params.ExpressionAttributeValues) {
         const translation = Bimap.from(
           mapKeys(this.params.ExpressionAttributeNames as any, k =>
@@ -177,29 +186,41 @@ export class DeletionChain<
   }
 }
 
+type UpdateOpts = {
+  table: string
+  ifExists?: boolean
+  key: any
+}
+
 export class UpdateChain<
-  T1 extends Fields,
+  T0 extends Schema<T1>,
+  T1 extends Fields = Omit<T0, 'key'>,
   T2 extends ReturnType = 'NONE',
   T3 = T2 extends 'NONE' ? undefined : Item<T1>
 > extends Chain<T1, T2, T3> {
+  protected params:
+    | AWS.DynamoDB.DocumentClient.UpdateItemInput
+    | undefined = undefined
+
   constructor(
     fields: T1,
     client: AWS.DynamoDB.DocumentClient,
-    protected readonly params: AWS.DynamoDB.DocumentClient.UpdateItemInput,
+    private readonly update: UpdateInput<T0, T1> & UpdateOpts,
     returnType: T2
   ) {
-    super(fields, client, params, returnType)
+    super(fields, client, undefined, returnType)
   }
 
   then(resolve: ThenCB<T3>, reject: (reason: any) => void = () => {}) {
-    if (!this.compile(reject)) return
-    const params = this.params
+    this.params = this.buildParams()
+    if (!this.compile(reject) || !this.params) return
+
     if (this.returnType.startsWith('UPDATED_'))
       this.params.ReturnValues = this.returnType
     else if (this.returnType !== 'NONE')
       this.params.ReturnValues = `ALL_${this.returnType}`
     return this.client
-      .update(params)
+      .update(this.params)
       .promise()
       .then(({ Attributes }) => {
         if (this.returnType !== 'NONE') resolve(decode(Attributes) as T3)
@@ -208,20 +229,85 @@ export class UpdateChain<
       .catch(reject)
   }
 
-  returning<T extends ReturnType>(v: T): UpdateChain<T1, T> {
-    return new UpdateChain(this.fields, this.client, this.params, v)
+  returning<T extends ReturnType>(v: T): UpdateChain<T0, T1, T> {
+    return new UpdateChain(this.fields, this.client, this.update, v)
   }
 
-  ifExists(): UpdateChain<T1, T2, T3> {
-    const params = { ExpressionAttributeValues: {}, ...this.params }
+  ifExists(): UpdateChain<T0, T1, T2, T3> {
+    return new UpdateChain(
+      this.fields,
+      this.client,
+      { ...this.update, ifExists: true },
+      this.returnType
+    )
+  }
 
-    params.ConditionExpression = Object.entries(params.Key)
-      .map(([k, v]) => {
-        params.ExpressionAttributeValues[`:${k}`] = v
-        return `${k}=:${k}`
+  private buildParams(): AWS.DynamoDB.DocumentClient.UpdateItemInput {
+    const ExpressionAttributeNames: Record<string, string> = {}
+    const ExpressionAttributeValues: Record<string, any> = {}
+    const updates: string[] = []
+
+    const params: Partial<AWS.DynamoDB.DocumentClient.UpdateItemInput> = {
+      TableName: this.update.table,
+      Key: this.update.key,
+    }
+
+    if (this.update.set) {
+      const sets: [string, string][] = []
+
+      for (const [k, v] of Object.entries(this.update.set)) {
+        const encKey = Chain.encodeKey(k)
+        ExpressionAttributeNames[`#${encKey}`] = k
+        ExpressionAttributeValues[`:${encKey}`] = v
+        sets.push([`#${encKey}`, `:${encKey}`])
+      }
+
+      if (sets.length)
+        updates.push(`SET ${sets.map(v => v.join('=')).join(', ')}`)
+    }
+
+    if (this.update.remove) {
+      const remove: string[] = []
+
+      for (const key of this.update.remove) {
+        const encKey = '#' + Chain.encodeKey(key)
+        ExpressionAttributeNames[encKey] = key
+        remove.push(encKey)
+      }
+
+      if (remove.length) updates.push(`REMOVE ${remove.join(', ')}`)
+    }
+
+    if (this.update.ifExists && params?.Key) {
+      params.ConditionExpression = Object.entries(params.Key)
+        .map(([k, v]) => {
+          ExpressionAttributeValues[`:${k}`] = v
+          return `${k}=:${k}`
+        })
+        .join(' AND ')
+    }
+
+    return (Object.fromEntries(
+      Object.entries({
+        ...params,
+        ExpressionAttributeNames,
+        ExpressionAttributeValues,
+        UpdateExpression: updates.join(' '),
       })
-      .join(' AND ')
+        .map(([k, v]) => {
+          if (typeof v === 'object' && Object.keys(v).length === 0) return
+          return [k, v]
+        })
+        .filter(Boolean) as any
+    ) as unknown) as AWS.DynamoDB.DocumentClient.UpdateItemInput
+  }
 
-    return new UpdateChain(this.fields, this.client, params, this.returnType)
+  protected clone(fields: T1 = this.fields): this {
+    return new UpdateChain(
+      fields,
+      this.client,
+      this.update,
+      this.returnType
+    ) as this
   }
 }

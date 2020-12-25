@@ -12,7 +12,7 @@ const ddbOpts = {
 const ddb = new DynamoDB(ddbOpts)
 const db = new DDB(
   TableName,
-  { key: 'id', id: String, data: String, strset: [String], list: [] },
+  { key: 'id', id: String, data: String, strset: [String], list: [], abc: [] },
   ddbOpts
 )
 
@@ -38,6 +38,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await ddb.deleteTable({ TableName }).promise()
 })
+
+const ranId = () => ((Math.random() * 1e6) | 0).toString(16)
 
 // get
 
@@ -138,7 +140,9 @@ test('update return NEW', async () => {
 
 test('update if exists', async () => {
   const id = `id-${Date.now()}`
-  expect(db.update(id, { data: 'foo' }).returning('NEW')).resolves.toEqual({
+  await expect(
+    db.update(id, { data: 'foo' }).returning('NEW')
+  ).resolves.toEqual({
     id,
     data: 'foo',
   })
@@ -150,6 +154,17 @@ test('update if exists', async () => {
   expect(
     db.update(id, { data: 'bar' }).ifExists().returning('UPDATED_NEW')
   ).resolves.toEqual({ data: 'bar' })
+})
+
+test('delete attribute', async () => {
+  const obj = { id: ranId(), foo: 'bar', x: 'x' }
+  await db.put(obj)
+  // @ts-ignore
+  delete obj.x
+  await expect(
+    db.update(obj.id, { $remove: ['x'] }).returning('NEW')
+  ).resolves.toEqual(obj)
+  await expect(db.get(obj.id)).resolves.toEqual(obj)
 })
 
 // sets & lists
@@ -203,3 +218,10 @@ test('explicit List', async () => {
     db.put({ id: 'explist', strset: ['a', 2] } as any)
   ).rejects.toThrow()
 })
+
+// list manipulation
+
+// test('list insert & delete', async () => {
+//   const obj = { id: ranId(), abc: ['a', 'b', 'x', 'd'] }
+//   expect(db.put(obj).returning('NEW')).resolves.toEqual(obj)
+// })

@@ -58,10 +58,20 @@ type Item<TFields extends Fields, TKey extends Key<TFields>> = {
     >
   }
 
+type UpdateInput<
+  T extends Schema<F>,
+  F extends Fields = Omit<T, 'key'>,
+  TI = Omit<Item<F, T['key']>, KeyFields<F, T['key']>>
+> = {
+  set?: Record<string, any> & TI
+  remove?: string[]
+}
+
 type ItemUpdate<
   T extends Schema<F>,
-  F extends Fields = Omit<T, 'key'>
-> = Record<string, any> & Omit<Item<F, T['key']>, KeyFields<F, T['key']>>
+  F extends Fields = Omit<T, 'key'>,
+  U extends UpdateInput<T, F> = UpdateInput<T, F>
+> = NonNullable<U['set']> & { $remove?: U['remove'] }
 
 // generic helper types
 
@@ -86,3 +96,5 @@ type PrimitiveConstructorType<
 type ExplTypes<T extends Record<string, any>> = {
   [K in keyof T]?: 'Set' | 'List'
 }
+
+type Primitive = null | undefined | string | number | boolean | symbol | bigint
