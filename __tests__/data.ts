@@ -1,50 +1,10 @@
-import { DDB } from '../src'
-import * as localDynamo from 'local-dynamo'
-import { DynamoDB } from 'aws-sdk'
-
-const TableName = `test-ddb-${Date.now()}`
-
-const ddbOpts = {
-  region: 'localhost',
-  endpoint: 'http://localhost:4567',
-}
-
-const ddb = new DynamoDB(ddbOpts)
-const db = new DDB(
-  TableName,
-  { key: 'id', id: String, data: String, strset: [String], list: [], abc: [] },
-  ddbOpts
-)
-
-beforeAll(async () => {
-  localDynamo.launch(undefined, 4567)
-  await ddb
-    .createTable({
-      AttributeDefinitions: [{ AttributeName: 'id', AttributeType: 'S' }],
-      KeySchema: [{ AttributeName: 'id', KeyType: 'HASH' }],
-      ProvisionedThroughput: {
-        ReadCapacityUnits: 1,
-        WriteCapacityUnits: 1,
-      },
-      TableName,
-    })
-    .promise()
-
-  await db.client
-    .put({ TableName, Item: { id: 'bar', data: 'something' } })
-    .promise()
-})
-
-afterAll(async () => {
-  await ddb.deleteTable({ TableName }).promise()
-})
-
-const ranId = () => ((Math.random() * 1e6) | 0).toString(16)
+import { db, ranId } from './utils/db'
 
 // get
 
 test('get non-existent item', async () =>
   await expect(db.get('foo')).resolves.toBeUndefined())
+
 test('get existing item', async () =>
   await expect(db.get('bar')).resolves.toEqual({
     id: 'bar',
@@ -232,5 +192,15 @@ test('explicit List', async () => {
 
 // test('list insert & delete', async () => {
 //   const obj = { id: ranId(), abc: ['a', 'b', 'x', 'd'] }
-//   expect(db.put(obj).returning('NEW')).resolves.toEqual(obj)
+//   await expect(db.put(obj).returning('NEW')).resolves.toEqual(obj)
+//   await expect(
+//     db.update(obj.id, { 'abc[2]': '_' }).returning('NEW')
+//   ).resolves.toEqual({ abc: ['a', 'b', '_', 'd'] })
+//   // await expect(
+//   //   db.update(obj.id).remove('abc[2]').returning('UPDATED_NEW')
+//   // ).resolves.toEqual({ abc: ['a', 'b', 'd'] })
+//   await expect(db.get(obj.id)).resolves.toEqual({
+//     id: obj.id,
+//     abc: ['a', 'b', 'd'],
+//   })
 // })

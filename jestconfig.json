@@ -10,5 +10,8 @@
     "jsx",
     "json",
     "node"
+  ],
+  "modulePathIgnorePatterns": [
+    "<rootDir>/__tests__/utils/*"
   ]
 }
