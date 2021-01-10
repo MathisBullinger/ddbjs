@@ -9,6 +9,7 @@ type SchemaValueType =
   | [StringConstructor]
   | [NumberConstructor]
   | []
+  | { [K: string]: SchemaValueType }
 
 type PrimitiveKeys<T extends Fields> = {
   [K in keyof T]: T[K] extends Function ? K : never
@@ -28,6 +29,8 @@ type SchemaValue<T extends SchemaValueType> = T extends PrimitiveConstructor
   ? any[]
   : T extends any[]
   ? Readonly<NonEmpty<PrimitiveConstructorType<T[number]>>>
+  : T extends Fields
+  ? Item<T, never>
   : never
 
 type KeyValue<
@@ -57,6 +60,9 @@ type Item<TFields extends Fields, TKey extends Key<TFields>> = {
       TFields[K]
     >
   }
+
+type DBItem<T extends Fields> = { [K in keyof T]: SchemaValue<T[K]> } &
+  Record<string, any>
 
 type UpdateInput<
   T extends Schema<F>,

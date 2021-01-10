@@ -15,7 +15,21 @@ export const ddb = new DynamoDB(opts)
 
 export const db = new DDB(
   TableName,
-  { key: 'id', id: String, data: String, strset: [String], list: [], abc: [] },
+  {
+    key: 'id',
+    id: String,
+    data: String,
+    strset: [String],
+    list: [],
+    abc: [],
+    map: {
+      str: String,
+      num: Number,
+      list: [],
+      set: [String],
+      nested: { foo: String },
+    },
+  },
   opts
 )
 
