@@ -1,4 +1,5 @@
 import * as AWS from 'aws-sdk'
+// import { PutChain, DeletionChain, UpdateChain } from './chain'
 import { PutChain, DeletionChain, UpdateChain } from './chain'
 import { decode } from './utils/convert'
 
@@ -19,9 +20,14 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
   constructor(
     public readonly table: string,
     private readonly schema: T,
-    params?: ConstructorParameters<typeof AWS.DynamoDB.DocumentClient>[0]
+    params?:
+      | ConstructorParameters<typeof AWS.DynamoDB.DocumentClient>[0]
+      | AWS.DynamoDB.DocumentClient
   ) {
-    this.client = new AWS.DynamoDB.DocumentClient(params)
+    this.client =
+      params instanceof AWS.DynamoDB.DocumentClient
+        ? params
+        : new AWS.DynamoDB.DocumentClient(params)
     this.fields = Object.fromEntries(
       Object.entries(schema).filter(([k]) => k !== 'key')
     ) as F
@@ -42,15 +48,15 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     return decode(Item) as Item<F, T['key']>
   }
 
-  public put<I extends Item<F, T['key']>>(item: I) {
+  public put<I extends Item<F, T['key']>>(item: I): PutChain<F, 'NONE'> {
     const params: AWS.DynamoDB.DocumentClient.PutItemInput = {
       TableName: this.table,
       Item: item,
     }
-    return new PutChain(this.fields, this.client, params, 'NONE')
+    return new PutChain(this.fields, this.client, params)
   }
 
-  public delete(...key: KeyValue<T, F>) {
+  public delete(...key: KeyValue<T, F>): DeletionChain<F, 'NONE'> {
     const params: AWS.DynamoDB.DocumentClient.DeleteItemInput = {
       TableName: this.table,
       Key: this.key(...key),
@@ -61,25 +67,18 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
   public update<U extends ItemUpdate<T, F>>(
     key: FlatKeyValue<T, F>,
     update?: U
-  ) {
+  ): UpdateChain<T, F> {
     const remove = update?.$remove
     delete update?.$remove
-    const input: UpdateInput<T, F> = {
+
+    return new UpdateChain(this.fields, this.client, {
+      table: this.table,
+      key: this.key(
+        ...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>)
+      ),
       set: update,
       remove,
-    }
-    return new UpdateChain<T, F>(
-      this.fields,
-      this.client,
-      {
-        table: this.table,
-        key: this.key(
-          ...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>)
-        ),
-        ...input,
-      },
-      'NONE'
-    )
+    })
   }
 
   private key(...v: KeyValue<T, F>) {
