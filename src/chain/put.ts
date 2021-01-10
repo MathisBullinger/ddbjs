@@ -5,9 +5,14 @@ import { oneOf } from '../utils/array'
 
 type ReturnType = 'NONE' | 'NEW' | 'OLD' | 'UPDATED_OLD' | 'UPDATED_NEW'
 
-type Item<T extends Fields> = { [K in keyof T]: SchemaValue<T[K]> }
+type Item<T extends Fields> = { [K in keyof T]: SchemaValue<T[K]> } &
+  Record<string, any>
 
-export default class PutChain<T extends Fields> extends BaseChain<Item<T>> {
+export default class PutChain<
+  T extends Fields,
+  R extends ReturnType,
+  F = R extends 'NONE' ? undefined : Item<T>
+> extends BaseChain<F> {
   constructor(
     private readonly fields: T,
     protected readonly client: AWS.DynamoDB.DocumentClient,
@@ -27,7 +32,7 @@ export default class PutChain<T extends Fields> extends BaseChain<Item<T>> {
       })
       .promise()
 
-    const result: Item<T> = decode(
+    const result: F = decode(
       this.returnType === 'NEW'
         ? this.params.Item
         : this.returnType === 'OLD'
@@ -38,7 +43,7 @@ export default class PutChain<T extends Fields> extends BaseChain<Item<T>> {
     this.resolve(result)
   }
 
-  returning(v: ReturnType): PutChain<T> {
+  returning<R extends ReturnType>(v: R): PutChain<T, R> {
     assert(oneOf(v, 'NEW', 'OLD', 'NONE'), new ReturnValueError(v, 'insert'))
     return new PutChain(this.fields, this.client, this.params, v)
   }
