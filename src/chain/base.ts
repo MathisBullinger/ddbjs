@@ -42,17 +42,26 @@ export default abstract class BaseChain<
     return Buffer.from(v, 'hex').toString()
   }
 
-  protected isSet(key: string): boolean {
-    const type = this.fields[key]
+  protected isSet(key: string, entry = this.fields): boolean {
+    const type = entry[key]
     if (!Array.isArray(type)) return false
     return type.length === 1
   }
 
-  protected makeSets(target: any) {
+  protected makeSets(target: any, entry: any = this.fields) {
     if (!target) return
     const mapped = { ...target } as any
-    for (const [k, v] of Object.entries(mapped))
-      if (this.isSet(k) && Array.isArray(v)) mapped[k] = this.createSet(v)
+    for (const [k, v] of Object.entries(mapped)) {
+      if (
+        k in this.fields &&
+        typeof v === 'object' &&
+        !Array.isArray(v) &&
+        v !== null
+      )
+        mapped[k] = this.makeSets(v, this.fields[k])
+      else if (this.isSet(k, entry) && Array.isArray(v))
+        mapped[k] = this.createSet(v)
+    }
     return mapped
   }
 
