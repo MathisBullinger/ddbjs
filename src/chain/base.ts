@@ -1,10 +1,16 @@
-export default abstract class BaseChain<T> extends Promise<T> {
+export default abstract class BaseChain<
+  T,
+  F extends Fields
+> extends Promise<T> {
   static get [Symbol.species]() {
     return Promise
   }
 
   // @ts-ignore
-  constructor(protected readonly client: AWS.DynamoDB.DocumentClient) {
+  constructor(
+    readonly fields: F,
+    protected readonly client: AWS.DynamoDB.DocumentClient
+  ) {
     let _resolve: any
     let _reject: any
     super((res, rej) => {
@@ -22,9 +28,35 @@ export default abstract class BaseChain<T> extends Promise<T> {
     res?: (value: T) => TResult1 | PromiseLike<TResult1>,
     rej?: (reason: any) => TResult2 | PromiseLike<TResult2>
   ): Promise<TResult1 | TResult2> {
-    this.execute()
+    this.execute().catch(this.reject)
     return super.then(res, rej)
   }
 
   protected abstract execute(): Promise<void>
+
+  protected static encodeKey(v: string) {
+    return Buffer.from(v).toString('hex')
+  }
+
+  protected static decodeKey(v: string) {
+    return Buffer.from(v, 'hex').toString()
+  }
+
+  protected isSet(key: string): boolean {
+    const type = this.fields[key]
+    if (!Array.isArray(type)) return false
+    return type.length === 1
+  }
+
+  protected makeSets(target: any) {
+    if (!target) return
+    const mapped = { ...target } as any
+    for (const [k, v] of Object.entries(mapped))
+      if (this.isSet(k) && Array.isArray(v)) mapped[k] = this.createSet(v)
+    return mapped
+  }
+
+  protected createSet(v: any[]) {
+    return this.client.createSet(v)
+  }
 }
