@@ -1,5 +1,4 @@
 import * as AWS from 'aws-sdk'
-// import { PutChain, DeletionChain, UpdateChain } from './chain'
 import { PutChain, DeletionChain, UpdateChain } from './chain'
 import { decode } from './utils/convert'
 
@@ -67,7 +66,7 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
   public update<U extends ItemUpdate<T, F>>(
     key: FlatKeyValue<T, F>,
     update?: U
-  ): UpdateChain<T, F> {
+  ): UpdateChain<T, 'NONE', F> {
     const remove = update?.$remove
     delete update?.$remove
 

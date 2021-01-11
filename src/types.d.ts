@@ -102,5 +102,3 @@ type PrimitiveConstructorType<
 type ExplTypes<T extends Record<string, any>> = {
   [K in keyof T]?: 'Set' | 'List'
 }
-
-type Primitive = null | undefined | string | number | boolean | symbol | bigint

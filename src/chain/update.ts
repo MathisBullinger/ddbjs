@@ -1,5 +1,6 @@
 import BaseChain from './base'
 import * as build from '../expression'
+import { decode } from '../utils/convert'
 
 type ReturnType = 'NONE' | 'OLD' | 'NEW' | 'UPDATED_OLD' | 'UPDATED_NEW'
 
@@ -11,8 +12,14 @@ type UpdateOpts = {
 
 export default class UpdateChain<
   T extends Schema<F>,
-  F extends Fields = Omit<T, 'key'>
-> extends BaseChain<F, any> {
+  RT extends ReturnType,
+  F extends Fields = Omit<T, 'key'>,
+  RV = RT extends 'NONE'
+    ? undefined
+    : RT extends 'OLD' | 'NEW'
+    ? DBItem<F>
+    : Partial<DBItem<F>>
+> extends BaseChain<RV, F> {
   constructor(
     fields: F,
     client: AWS.DynamoDB.DocumentClient,
@@ -26,36 +33,48 @@ export default class UpdateChain<
     const params: Partial<AWS.DynamoDB.DocumentClient.UpdateItemInput> = {
       TableName: this.update.table,
       Key: this.update.key,
+      ExpressionAttributeValues: {},
     }
-
-    const updateExpressions: string[] = []
-    const ExpressionAttributeValues: Record<string, any> = {}
-    const ExpressionAttributeNames: Record<string, string> = {}
+    const conditions: string[] = []
 
     this.update.set = this.makeSets(this.update.set)
 
-    if (this.update.set) {
-      const expr = build.set(this.update.set)
-      updateExpressions.push(expr.UpdateExpression)
-      Object.assign(ExpressionAttributeValues, expr.ExpressionAttributeValues)
-      Object.assign(
-        ExpressionAttributeNames,
-        expr.ExpressionAttributeNames ?? {}
-      )
+    Object.assign(params, build.merge(build.set(this.update.set)))
+
+    params.ReturnValues = ['NEW', 'OLD'].includes(this.returnType)
+      ? `ALL_${this.returnType}`
+      : this.returnType
+
+    if (this.update.ifExists) {
+      for (const [k, v] of Object.entries(params.Key!)) {
+        const name = `:${k}`
+        params.ExpressionAttributeValues![name] = v
+        conditions.push(`${k}=${name}`)
+      }
     }
 
-    if (Object.keys(ExpressionAttributeValues).length)
-      params.ExpressionAttributeValues = ExpressionAttributeValues
-    if (Object.keys(ExpressionAttributeNames).length)
-      params.ExpressionAttributeNames = ExpressionAttributeNames
-
-    params.UpdateExpression = updateExpressions.join(' ')
+    if (conditions.length) params.ConditionExpression = conditions.join(' AND ')
 
     if (!this.isComplete(params)) throw Error('incomplete update')
 
-    await this.client.update(params).promise()
+    const { Attributes } = await this.client.update(params).promise()
+    const result: RV = decode(
+      this.returnType === 'NONE' ? undefined : Attributes
+    ) as any
+    this.resolve(result)
+  }
 
-    this.resolve(undefined as any)
+  returning<R extends ReturnType>(v: R): UpdateChain<T, R, F> {
+    return new UpdateChain(this.fields, this.client, this.update, v)
+  }
+
+  ifExists(): UpdateChain<T, RT, F, RV> {
+    return new UpdateChain(
+      this.fields,
+      this.client,
+      { ...this.update, ifExists: true },
+      this.returnType
+    )
   }
 
   private isComplete(
