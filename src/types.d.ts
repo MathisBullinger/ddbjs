@@ -101,4 +101,5 @@ type PrimitiveConstructorType<
 
 type ExplTypes<T extends Record<string, any>> = {
   [K in keyof T]?: 'Set' | 'List'
-}
+} &
+  Record<string, 'Set' | 'List'>

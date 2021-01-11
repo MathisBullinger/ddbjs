@@ -1,3 +1,5 @@
+import { clone } from '../utils/object'
+
 export default abstract class BaseChain<
   T,
   F extends Fields
@@ -68,4 +70,27 @@ export default abstract class BaseChain<
   protected createSet(v: any[]) {
     return this.client.createSet(v)
   }
+
+  protected _cast(casts: ExplTypes<F>): this {
+    const fields = clone(this.fields)
+
+    const apply = (
+      type: 'Set' | 'List',
+      path: string[],
+      target: any = fields
+    ) => {
+      if (path.length === 1) {
+        target[path[0]] = type === 'List' ? [] : [String]
+        return
+      }
+      apply(type, path.slice(1), (target[path[0]] ??= {}))
+    }
+
+    for (const [path, type] of Object.entries(casts))
+      apply(type, path.split('.'))
+
+    return this.clone(fields)
+  }
+
+  protected abstract clone(fields?: F): this
 }

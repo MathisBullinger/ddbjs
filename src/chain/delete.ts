@@ -40,4 +40,13 @@ export default class DeletionChain<
     assert(oneOf(v, 'NONE', 'OLD'), new ReturnValueError(v, 'delete'))
     return new DeletionChain(this.fields, this.client, this.params, v)
   }
+
+  protected clone(fields = this.fields) {
+    return new DeletionChain(
+      fields,
+      this.client,
+      this.params,
+      this.returnType
+    ) as any
+  }
 }

@@ -44,6 +44,7 @@ export const set = (input?: Record<string, any>): Expression | undefined => {
 }
 
 export const remove = (...fields: string[]): Expression | undefined => {
+  fields = Array.from(new Set(fields))
   if (!fields.length) return
   const names: string[] = []
   const ExpressionAttributeNames: Expression['ExpressionAttributeNames'] = {}

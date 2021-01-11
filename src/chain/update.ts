@@ -33,13 +33,18 @@ export default class UpdateChain<
     const params: Partial<AWS.DynamoDB.DocumentClient.UpdateItemInput> = {
       TableName: this.update.table,
       Key: this.update.key,
-      ExpressionAttributeValues: {},
     }
     const conditions: string[] = []
 
     this.update.set = this.makeSets(this.update.set)
 
-    Object.assign(params, build.merge(build.set(this.update.set)))
+    Object.assign(
+      params,
+      build.merge(
+        build.set(this.update.set),
+        build.remove(...(this.update.remove ?? []))
+      )
+    )
 
     params.ReturnValues = ['NEW', 'OLD'].includes(this.returnType)
       ? `ALL_${this.returnType}`
@@ -48,7 +53,7 @@ export default class UpdateChain<
     if (this.update.ifExists) {
       for (const [k, v] of Object.entries(params.Key!)) {
         const name = `:${k}`
-        params.ExpressionAttributeValues![name] = v
+        ;(params.ExpressionAttributeValues ??= {})[name] = v
         conditions.push(`${k}=${name}`)
       }
     }
@@ -62,6 +67,18 @@ export default class UpdateChain<
       this.returnType === 'NONE' ? undefined : Attributes
     ) as any
     this.resolve(result)
+  }
+
+  remove(...fields: string[]): UpdateChain<T, RT, F, RV> {
+    const update = this.update
+    update.remove = [...(update.remove ?? []), ...fields]
+
+    return new UpdateChain(
+      this.fields,
+      this.client,
+      this.update,
+      this.returnType
+    )
   }
 
   returning<R extends ReturnType>(v: R): UpdateChain<T, R, F> {
@@ -83,5 +100,16 @@ export default class UpdateChain<
     if (!input.UpdateExpression?.length)
       throw Error('missing update expression')
     return true
+  }
+
+  public cast = super._cast.bind(this)
+
+  protected clone(fields = this.fields) {
+    return new UpdateChain(
+      fields,
+      this.client,
+      this.update,
+      this.returnType
+    ) as any
   }
 }

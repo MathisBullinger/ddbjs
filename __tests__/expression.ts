@@ -19,6 +19,9 @@ test('remove expr', () => {
   expect(expr.remove('a', 'b', 'c')).toEqual({
     UpdateExpression: 'REMOVE a, b, c',
   })
+  expect(expr.remove('a', 'a', 'b', 'c', 'b')).toEqual({
+    UpdateExpression: 'REMOVE a, b, c',
+  })
   expect(expr.remove()).toBeUndefined()
 })
 

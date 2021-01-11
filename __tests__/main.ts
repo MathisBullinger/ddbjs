@@ -152,25 +152,25 @@ test('update if exists', async () => {
   ).resolves.toEqual({ data: 'bar' })
 })
 
-// test.only('delete attribute', async () => {
-//   const obj: any = { id: ranId(), foo: 'bar', x: 'x' }
-//   await db.put(obj)
-//   delete obj.x
-//   await expect(
-//     db.update(obj.id, { $remove: ['x'] }).returning('NEW')
-//   ).resolves.toEqual(obj)
-//   await expect(db.get(obj.id)).resolves.toEqual(obj)
+test('delete attribute', async () => {
+  const obj: any = { id: ranId(), foo: 'bar', x: 'x' }
+  await db.put(obj)
+  delete obj.x
+  await expect(
+    db.update(obj.id, { $remove: ['x'] }).returning('NEW')
+  ).resolves.toEqual(obj)
+  await expect(db.get(obj.id)).resolves.toEqual(obj)
 
-//   // obj.y = 'y'
-//   // await expect(db.update(obj.id, { y: 'y' }).returning('NEW')).resolves.toEqual(
-//   //   obj
-//   // )
-//   // delete obj.y
-//   // await expect(db.update(obj.id).remove('y').returning('NEW')).resolves.toEqual(
-//   //   obj
-//   // )
-//   // await expect(db.get(obj.id)).resolves.toEqual(obj)
-// })
+  obj.y = 'y'
+  await expect(db.update(obj.id, { y: 'y' }).returning('NEW')).resolves.toEqual(
+    obj
+  )
+  delete obj.y
+  await expect(db.update(obj.id).remove('y').returning('NEW')).resolves.toEqual(
+    obj
+  )
+  await expect(db.get(obj.id)).resolves.toEqual(obj)
+})
 
 // // sets & lists
 
@@ -203,42 +203,61 @@ test('can insert empty list', async () => {
   await expect(db.get('list')).resolves.toEqual({ id: 'list', list: [] })
 })
 
-// test('explicit Set', async () => {
-//   await expect(
-//     db.put({ id: 'expset', explset: ['a'] }).cast({ explset: 'Set' })
-//   ).resolves.not.toThrow()
-//   await expect(
-//     db.update('expset', { explset: ['a', 'a'] }).cast({ explset: 'Set' })
-//   ).rejects.toThrow()
-//   await expect(
-//     db.put({ id: 'expset2', explset: ['a', 'a'] }).cast({ explset: 'Set' })
-//   ).rejects.toThrow()
+test('explicit Set', async () => {
+  await expect(
+    db.put({ id: 'expset', explset: ['a'] }).cast({ explset: 'Set' })
+  ).resolves.not.toThrow()
+  await expect(
+    db.update('expset', { explset: ['a', 'a'] }).cast({ explset: 'Set' })
+  ).rejects.toThrow()
 
-//   // await Promise.all([db.put({ id: 'asdf' })])
+  await expect(
+    db.put({ id: 'expset2', explset: ['a', 'a'] }).cast({ explset: 'Set' })
+  ).rejects.toThrow()
+})
+
+test('explicit List', async () => {
+  await expect(
+    db.put({ id: ranId(), strset: ['a', 2] } as any).cast({ strset: 'List' })
+  ).resolves.not.toThrow()
+  await expect(
+    db.put({ id: ranId(), strset: ['a', 2] } as any)
+  ).rejects.toThrow()
+
+  await expect(
+    db
+      .put({ id: ranId(), map: { set: ['a', 2] } } as any)
+      .cast({ 'map.set': 'List' })
+  ).resolves.not.toThrow()
+  await expect(
+    db.put({ id: ranId(), map: { set: ['a', 2] } } as any)
+  ).rejects.toThrow()
+})
+
+test('nested cast', async () => {
+  await expect(
+    db.put({ id: ranId(), map: { set: ['a', 'a'] } })
+  ).rejects.toThrow()
+  await expect(
+    db
+      .put({ id: ranId(), map: { set: ['a', 'a'] } })
+      .cast({ 'map.set': 'List' })
+  ).resolves.not.toThrow()
+})
+
+// list manipulation
+
+// test('list insert & delete', async () => {
+//   const obj = { id: ranId(), abc: ['a', 'b', 'x', 'd'] }
+//   await expect(db.put(obj).returning('NEW')).resolves.toEqual(obj)
+//   await expect(
+//     db.update(obj.id, { 'abc[2]': '_' }).returning('NEW')
+//   ).resolves.toEqual({ abc: ['a', 'b', '_', 'd'] })
+//   // await expect(
+//   //   db.update(obj.id).remove('abc[2]').returning('UPDATED_NEW')
+//   // ).resolves.toEqual({ abc: ['a', 'b', 'd'] })
+//   await expect(db.get(obj.id)).resolves.toEqual({
+//     id: obj.id,
+//     abc: ['a', 'b', 'd'],
+//   })
 // })
-
-// test('explicit List', async () => {
-//   await expect(
-//     db.put({ id: 'explist', strset: ['a', 2] } as any).cast({ strset: 'List' })
-//   ).resolves.not.toThrow()
-//   await expect(
-//     db.put({ id: 'explist', strset: ['a', 2] } as any)
-//   ).rejects.toThrow()
-// })
-
-// // list manipulation
-
-// // test('list insert & delete', async () => {
-// //   const obj = { id: ranId(), abc: ['a', 'b', 'x', 'd'] }
-// //   await expect(db.put(obj).returning('NEW')).resolves.toEqual(obj)
-// //   await expect(
-// //     db.update(obj.id, { 'abc[2]': '_' }).returning('NEW')
-// //   ).resolves.toEqual({ abc: ['a', 'b', '_', 'd'] })
-// //   // await expect(
-// //   //   db.update(obj.id).remove('abc[2]').returning('UPDATED_NEW')
-// //   // ).resolves.toEqual({ abc: ['a', 'b', 'd'] })
-// //   await expect(db.get(obj.id)).resolves.toEqual({
-// //     id: obj.id,
-// //     abc: ['a', 'b', 'd'],
-// //   })
-// // })

@@ -46,4 +46,15 @@ export default class PutChain<
     assert(oneOf(v, 'NEW', 'OLD', 'NONE'), new ReturnValueError(v, 'insert'))
     return new PutChain(this.fields, this.client, this.params, v)
   }
+
+  public cast = super._cast.bind(this)
+
+  protected clone(fields = this.fields) {
+    return new PutChain(
+      fields,
+      this.client,
+      this.params,
+      this.returnType
+    ) as any
+  }
 }
