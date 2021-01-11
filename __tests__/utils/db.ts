@@ -1,8 +1,14 @@
 import { DDB } from '../../src'
 import * as localDynamo from 'local-dynamo'
-import { DynamoDB } from 'aws-sdk'
+import * as AWS from 'aws-sdk'
 
 export const ranId = () => ((Math.random() * 1e6) | 0).toString(16)
+
+AWS.config.update({
+  region: '========',
+  accessKeyId: '========',
+  secretAccessKey: '========',
+})
 
 export const TableName = `test-ddb-${Date.now()}`
 
@@ -11,7 +17,7 @@ export const opts = {
   endpoint: 'http://localhost:4567',
 }
 
-export const ddb = new DynamoDB(opts)
+export const ddb = new AWS.DynamoDB(opts)
 
 export const db = new DDB(
   TableName,
@@ -33,8 +39,10 @@ export const db = new DDB(
   opts
 )
 
+let child: ReturnType<typeof localDynamo.launch>
+
 beforeAll(async () => {
-  localDynamo.launch(undefined, 4567)
+  child = localDynamo.launch(undefined, 4567)
   await ddb
     .createTable({
       AttributeDefinitions: [{ AttributeName: 'id', AttributeType: 'S' }],
@@ -54,4 +62,5 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await ddb.deleteTable({ TableName }).promise()
+  child?.kill()
 })
