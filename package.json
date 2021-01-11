@@ -5,7 +5,7 @@
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.prod.json",
+    "build": "tsc -p tsconfig.prod.json && cp src/*.d.ts lib",
     "test": "jest --config jestconfig.json",
     "prepare": "npm run build",
     "postversion": "git push && git push --tags"
@@ -36,8 +36,5 @@
     "prettier": "^2.2.1",
     "ts-jest": "^26.4.4",
     "typescript": "^4.1.3"
-  },
-  "dependencies": {
-    "tsdast": "^0.2.1"
   }
 }
