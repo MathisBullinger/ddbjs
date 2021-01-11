@@ -1,4 +1,5 @@
 import { clone } from '../utils/object'
+import type { Fields, ExplTypes } from '../types'
 
 export default abstract class BaseChain<
   T,

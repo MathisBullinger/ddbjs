@@ -1,29 +1,31 @@
-type Schema<T extends Fields> = T & Readonly<{ key: Key<T> }>
+export type Schema<T extends Fields> = T & Readonly<{ key: Key<T> }>
 
-type Fields = Readonly<Record<string, SchemaValueType>>
+export type Fields = Readonly<Record<string, SchemaValueType>>
 
-type PrimitiveConstructor = StringConstructor | NumberConstructor
+export type PrimitiveConstructor = StringConstructor | NumberConstructor
 
-type SchemaValueType =
+export type SchemaValueType =
   | PrimitiveConstructor
   | [StringConstructor]
   | [NumberConstructor]
   | []
   | { [K: string]: SchemaValueType }
 
-type PrimitiveKeys<T extends Fields> = {
+export type PrimitiveKeys<T extends Fields> = {
   [K in keyof T]: T[K] extends Function ? K : never
 }[keyof T]
-type PrimitiveFields<T extends Fields> = Pick<T, PrimitiveKeys<T>>
+export type PrimitiveFields<T extends Fields> = Pick<T, PrimitiveKeys<T>>
 
-type Key<T extends Fields> = keyof PrimitiveFields<T> | CompositeKey<T>
+export type Key<T extends Fields> = keyof PrimitiveFields<T> | CompositeKey<T>
 
-type CompositeKey<R extends Fields, T extends Fields = PrimitiveFields<R>> = [
-  hash: keyof T,
-  sort: keyof T
-]
+export type CompositeKey<
+  R extends Fields,
+  T extends Fields = PrimitiveFields<R>
+> = [hash: keyof T, sort: keyof T]
 
-type SchemaValue<T extends SchemaValueType> = T extends PrimitiveConstructor
+export type SchemaValue<
+  T extends SchemaValueType
+> = T extends PrimitiveConstructor
   ? PrimitiveConstructorType<T>
   : T extends []
   ? any[]
@@ -33,7 +35,7 @@ type SchemaValue<T extends SchemaValueType> = T extends PrimitiveConstructor
   ? Item<T, never>
   : never
 
-type KeyValue<
+export type KeyValue<
   T extends Schema<F>,
   F extends Fields = Omit<T, 'key'>
 > = T['key'] extends CompositeKey<F>
@@ -42,17 +44,17 @@ type KeyValue<
   ? [SchemaValue<F[T['key']]>]
   : never
 
-type FlatKeyValue<
+export type FlatKeyValue<
   T extends Schema<F>,
   F extends Fields = Omit<T, 'key'>
 > = T['key'] extends CompositeKey<F> ? KeyValue<T, F> : KeyValue<T, F>[0]
 
-type KeyFields<T extends Fields, K extends Key<T>> = keyof Pick<
+export type KeyFields<T extends Fields, K extends Key<T>> = keyof Pick<
   T,
   K extends CompositeKey<T> ? K[0] | K[1] : K
 >
 
-type Item<TFields extends Fields, TKey extends Key<TFields>> = {
+export type Item<TFields extends Fields, TKey extends Key<TFields>> = {
   [K in KeyFields<TFields, TKey>]: SchemaValue<TFields[K]>
 } &
   {
@@ -61,10 +63,10 @@ type Item<TFields extends Fields, TKey extends Key<TFields>> = {
     >
   }
 
-type DBItem<T extends Fields> = { [K in keyof T]: SchemaValue<T[K]> } &
+export type DBItem<T extends Fields> = { [K in keyof T]: SchemaValue<T[K]> } &
   Record<string, any>
 
-type UpdateInput<
+export type UpdateInput<
   T extends Schema<F>,
   F extends Fields = Omit<T, 'key'>,
   TI = Omit<Item<F, T['key']>, KeyFields<F, T['key']>>
@@ -73,7 +75,7 @@ type UpdateInput<
   remove?: string[]
 }
 
-type ItemUpdate<
+export type ItemUpdate<
   T extends Schema<F>,
   F extends Fields = Omit<T, 'key'>,
   U extends UpdateInput<T, F> = UpdateInput<T, F>
@@ -81,9 +83,9 @@ type ItemUpdate<
 
 // generic helper types
 
-type NonEmpty<T> = [T, ...T[]]
+export type NonEmpty<T> = [T, ...T[]]
 
-type AtLeastOne<T, Keys extends keyof T = keyof T> = Pick<
+export type AtLeastOne<T, Keys extends keyof T = keyof T> = Pick<
   T,
   Exclude<keyof T, Keys>
 > &
@@ -91,15 +93,15 @@ type AtLeastOne<T, Keys extends keyof T = keyof T> = Pick<
     [K in Keys]-?: Required<Pick<T, K>> & Partial<Pick<T, Exclude<Keys, K>>>
   }[Keys]
 
-type NotEmptyObj<T extends Record<string, any>> = keyof T extends never
+export type NotEmptyObj<T extends Record<string, any>> = keyof T extends never
   ? never
   : T
 
-type PrimitiveConstructorType<
+export type PrimitiveConstructorType<
   T extends PrimitiveConstructor
 > = T extends StringConstructor ? string : number
 
-type ExplTypes<T extends Record<string, any>> = {
+export type ExplTypes<T extends Record<string, any>> = {
   [K in keyof T]?: 'Set' | 'List'
 } &
   Record<string, 'Set' | 'List'>

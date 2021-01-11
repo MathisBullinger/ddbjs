@@ -1,6 +1,7 @@
 import BaseChain from './base'
 import * as build from '../expression'
 import { decode } from '../utils/convert'
+import type { Fields, Schema, DBItem, UpdateInput } from '../types'
 
 type ReturnType = 'NONE' | 'OLD' | 'NEW' | 'UPDATED_OLD' | 'UPDATED_NEW'
 

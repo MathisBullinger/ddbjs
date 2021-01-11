@@ -1,11 +1,11 @@
 {
   "name": "sane-ddb",
   "version": "0.5.1",
-  "description": "",
+  "description": "A usable API for DynamoDB",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
   "scripts": {
-    "build": "tsc -p tsconfig.prod.json && cp src/*.d.ts lib",
+    "build": "tsc -p tsconfig.prod.json",
     "test": "jest --config jestconfig.json",
     "prepare": "npm run build",
     "postversion": "git push && git push --tags"

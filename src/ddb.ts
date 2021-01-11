@@ -1,6 +1,14 @@
 import * as AWS from 'aws-sdk'
 import { PutChain, DeletionChain, UpdateChain } from './chain'
 import { decode } from './utils/convert'
+import type {
+  Schema,
+  Fields,
+  KeyValue,
+  Item,
+  ItemUpdate,
+  FlatKeyValue,
+} from './types'
 
 export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
   public readonly client: AWS.DynamoDB.DocumentClient

@@ -2,6 +2,7 @@ import BaseChain from './base'
 import { decode } from '../utils/convert'
 import { assert, ReturnValueError } from '../utils/error'
 import { oneOf } from '../utils/array'
+import type { Fields, DBItem } from '../types'
 
 type ReturnType = 'NONE' | 'OLD'
 
