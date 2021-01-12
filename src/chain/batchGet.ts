@@ -1,37 +1,55 @@
 import BaseChain from './base'
 import { decode } from '../utils/convert'
-import type { Fields, DBItem } from '../types'
+import * as expr from '../expression'
+import type { Schema, Fields, DBItem } from '../types'
 
 const batch = <T>(arr: T[], batchSize: number): T[][] =>
   Array(Math.ceil(arr.length / batchSize))
     .fill(0)
     .map((_, i) => arr.slice(i * batchSize, (i + 1) * batchSize))
 
-export class BatchGetChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
+export class BatchGetChain<
+  T extends Schema<F>,
+  F extends Fields = Omit<T, 'key'>
+> extends BaseChain<DBItem<F>[], F> {
   constructor(
-    fields: T,
+    private readonly schema: T,
     client: AWS.DynamoDB.DocumentClient,
     private readonly table: string,
     private readonly keys: any[],
-    private readonly shouldSort: boolean = false
+    private readonly shouldSort: boolean = false,
+    private readonly selected?: string[],
+    private readonly removeFields: string[] = []
   ) {
-    super(fields, client)
+    super(schema, client)
   }
 
   async execute() {
+    const selected = [...(this.selected ?? [])]
+
+    const params = expr.project(...selected)
+
     const items = (
-      await Promise.all(batch(this.keys, 100).map(v => this.read(v)))
+      await Promise.all(
+        batch(this.keys, 100).map(v => this.read(v, params as any))
+      )
     ).flat()
 
     this.resolve(
-      (this.shouldSort
-        ? BatchGetChain.sortByKeys(this.keys, items)
-        : items
+      this.removeKeys(
+        this.shouldSort ? BatchGetChain.sortByKeys(this.keys, items) : items
       ).map(decode) as any
     )
   }
 
-  private async read(Keys?: any[]): Promise<any[]> {
+  public select(...fields: string[]): this {
+    return this.clone(this.schema, this.shouldSort, fields)
+  }
+
+  private async read(
+    Keys?: any[],
+    params?: Partial<AWS.DynamoDB.BatchGetItemInput>
+  ): Promise<any[]> {
     if (!Keys?.length) return []
 
     const { Responses, UnprocessedKeys } = await this.client
@@ -39,6 +57,7 @@ export class BatchGetChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
         RequestItems: {
           [this.table]: {
             Keys,
+            ...params,
           },
         },
       })
@@ -51,7 +70,25 @@ export class BatchGetChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
   }
 
   public sort() {
-    return this.clone(this.fields, true)
+    const keyFields = [this.schema.key].flat() as string[]
+    return this.clone(
+      this.schema,
+      true,
+      this.selected && [...this.selected, ...keyFields],
+      this.selected && keyFields.filter(v => !this.selected!.includes(v))
+    )
+  }
+
+  private removeKeys<T>(items: T[]): T[] {
+    if (!this.removeFields?.length) return items
+    return items.map(
+      v =>
+        Object.fromEntries(
+          Object.entries(v).map(([k, v]) =>
+            this.removeFields.includes(k) ? [] : [k, v]
+          )
+        ) as T
+    )
   }
 
   private static sortByKeys(keys: any[], items: any[]) {
@@ -71,13 +108,20 @@ export class BatchGetChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
     return sorted
   }
 
-  protected clone(fields = this.fields, sort = false): this {
+  protected clone(
+    schema = this.schema,
+    sort = false,
+    selected = this.selected,
+    remove = this.removeFields
+  ): this {
     return new BatchGetChain(
-      fields,
+      schema as any,
       this.client,
       this.table,
       this.keys,
-      sort
+      sort,
+      selected,
+      remove
     ) as any
   }
 }

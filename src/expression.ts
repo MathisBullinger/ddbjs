@@ -1,12 +1,19 @@
 import * as naming from './utils/naming'
 
-type Expression = {
-  UpdateExpression: string
+interface Expression {
   ExpressionAttributeValues?: Record<string, any>
   ExpressionAttributeNames?: Record<string, string>
 }
 
-const build = (expr: Expression): Expression => {
+interface UpdateExpression extends Expression {
+  UpdateExpression: string
+}
+
+interface ProjectionExpression extends Expression {
+  ProjectionExpression: string
+}
+
+const build = <T extends Expression>(expr: T): T => {
   const result = { ...expr }
   Object.entries(result).forEach(([k, v]) => {
     if (typeof v === 'object' && Object.keys(v).length === 0)
@@ -15,7 +22,9 @@ const build = (expr: Expression): Expression => {
   return result
 }
 
-export const set = (input?: Record<string, any>): Expression | undefined => {
+export const set = (
+  input?: Record<string, any>
+): UpdateExpression | undefined => {
   if (!input || !Object.keys(input).length) return
 
   const pairs: [string, string][] = []
@@ -43,7 +52,15 @@ export const set = (input?: Record<string, any>): Expression | undefined => {
   })
 }
 
-export const remove = (...fields: string[]): Expression | undefined => {
+const escape = <T extends 'UpdateExpression' | 'ProjectionExpression'>(
+  prefix: string,
+  field: T,
+  verb?: string
+) => (
+  ...fields: string[]
+):
+  | (T extends 'UpdateExpression' ? UpdateExpression : ProjectionExpression)
+  | undefined => {
   fields = Array.from(new Set(fields))
   if (!fields.length) return
   const names: string[] = []
@@ -52,28 +69,34 @@ export const remove = (...fields: string[]): Expression | undefined => {
   for (const field of fields) {
     if (naming.valid(field)) names.push(field)
     else {
-      const name = `#r${Object.keys(ExpressionAttributeNames).length}`
+      const name = `#${prefix}${Object.keys(ExpressionAttributeNames).length}`
       names.push(name)
       ExpressionAttributeNames[name] = field
     }
   }
 
   return build({
-    UpdateExpression: 'REMOVE ' + names.join(', '),
+    [field]: (verb ? `${verb} ` : '') + names.join(', '),
     ExpressionAttributeNames,
-  })
+  } as any)
 }
 
+export const remove = escape('r', 'UpdateExpression', 'REMOVE')
+
+export const project = escape('p', 'ProjectionExpression')
+
 export const merge = (
-  ...expressions: (Expression | undefined)[]
+  ...expressions: (UpdateExpression | ProjectionExpression | undefined)[]
 ): Expression => {
-  const exprs: string[] = []
+  const updateExprs: string[] = []
+  const projectExprs: string[] = []
   const ExpressionAttributeValues: Expression['ExpressionAttributeValues'] = {}
   const ExpressionAttributeNames: Expression['ExpressionAttributeNames'] = {}
 
   for (const e of expressions) {
     if (!e) continue
-    exprs.push(e.UpdateExpression)
+    if ('UpdateExpression' in e) updateExprs.push(e.UpdateExpression)
+    if ('ProjectionExpression' in e) projectExprs.push(e.ProjectionExpression)
 
     for (const [k, v] of Object.entries(e.ExpressionAttributeValues ?? {})) {
       if (k in ExpressionAttributeValues)
@@ -88,9 +111,9 @@ export const merge = (
     }
   }
 
-  const expr: Expression = {
-    UpdateExpression: exprs.join(' '),
-  }
+  const expr: Expression & Record<string, string> = {}
+  if (updateExprs.length) expr.UpdateExpression = updateExprs.join(' ')
+  if (projectExprs.length) expr.ProjectionExpression = projectExprs.join(', ')
   if (Object.keys(ExpressionAttributeValues).length)
     expr.ExpressionAttributeValues = ExpressionAttributeValues
   if (Object.keys(ExpressionAttributeNames).length)

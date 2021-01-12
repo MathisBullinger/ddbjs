@@ -49,9 +49,9 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     return new GetChain(this.fields, this.client, this.table, this.key(...key))
   }
 
-  public batchGet(...keys: FlatKeyValue<T, F>[]): BatchGetChain<F> {
+  public batchGet(...keys: FlatKeyValue<T, F>[]): BatchGetChain<T, F> {
     return new BatchGetChain(
-      this.fields,
+      this.schema,
       this.client,
       this.table,
       keys.map(key =>

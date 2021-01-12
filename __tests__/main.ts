@@ -11,6 +11,13 @@ test('get existing item', async () =>
     data: 'something',
   }))
 
+test('get select fields', async () => {
+  const id = ranId()
+  await db.put({ id, a: 'b', c: 'd', e: 'f', data: 'foo' })
+  await expect(db.get(id).select('a', 'c')).resolves.toEqual({ a: 'b', c: 'd' })
+  await expect(db.get(id).select('data')).resolves.toEqual({ data: 'foo' })
+})
+
 // batch get
 
 test('batch get', async () => {
@@ -48,6 +55,44 @@ test('batch get exceed size limit', async () => {
   await expect(
     db.batchGet(...items.map(({ id }) => id)).sort()
   ).resolves.toEqual(items)
+})
+
+test('batch get select fields', async () => {
+  const items = [
+    { id: ranId(), data: 'foo', a: 'b' },
+    { id: ranId(), data: 'bar', c: 'd' },
+  ]
+  await Promise.all(items.map(v => db.put(v)))
+
+  await expect(
+    db.batchGet(...items.map(({ id }) => id)).sort()
+  ).resolves.toEqual(items)
+
+  await expect(db.batchGet(items[0].id).select('data')).resolves.toEqual([
+    {
+      data: 'foo',
+    },
+  ])
+
+  const all = Array(200)
+    .fill(0)
+    .map(() => ({ id: ranId(), data: ranId() }))
+  await Promise.all(all.map(v => db.put(v)))
+
+  const pool = [...all]
+  const shuffled = []
+  for (let i = 0; i < 150; i++)
+    shuffled.push(pool.splice((Math.random() * pool.length) | 0, 1)[0])
+
+  await expect(
+    db.batchGet(...shuffled.map(({ id }) => id)).sort()
+  ).resolves.toEqual(shuffled)
+  await expect(
+    db
+      .batchGet(...shuffled.map(({ id }) => id))
+      .select('data')
+      .sort()
+  ).resolves.toEqual(shuffled.map(({ data }) => ({ data })))
 })
 
 // put

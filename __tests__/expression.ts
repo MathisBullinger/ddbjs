@@ -32,6 +32,19 @@ test('remove reserved key', () => {
   })
 })
 
+test('projection expr', () => {
+  expect(expr.project('a', 'b', 'c')).toEqual({
+    ProjectionExpression: 'a, b, c',
+  })
+})
+
+test('projection reserved key', () => {
+  expect(expr.project('data', 'foo', 'bar')).toEqual({
+    ProjectionExpression: '#p0, foo, bar',
+    ExpressionAttributeNames: { '#p0': 'data' },
+  })
+})
+
 test('merge expressions', () => {
   expect(
     expr.merge(
@@ -68,4 +81,25 @@ test('merge expressions', () => {
       { UpdateExpression: 'b', ExpressionAttributeNames: { foo: 'b' } }
     )
   ).toThrow()
+
+  expect(expr.merge({ ProjectionExpression: 'foo' })).toEqual({
+    ProjectionExpression: 'foo',
+  })
+
+  expect(
+    expr.merge({ ProjectionExpression: 'foo' }, { ProjectionExpression: 'bar' })
+  ).toEqual({
+    ProjectionExpression: 'foo, bar',
+  })
+
+  expect(
+    expr.merge(
+      { UpdateExpression: 'foo', ProjectionExpression: 'foo' },
+      { UpdateExpression: 'bar' },
+      { ProjectionExpression: 'bar' }
+    )
+  ).toEqual({
+    UpdateExpression: 'foo bar',
+    ProjectionExpression: 'foo, bar',
+  })
 })
