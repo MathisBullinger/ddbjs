@@ -30,7 +30,7 @@ export type SchemaValue<
   : T extends []
   ? any[]
   : T extends any[]
-  ? Readonly<NonEmpty<PrimitiveConstructorType<T[number]>>>
+  ? Readonly<PrimitiveConstructorType<T[number]>[]>
   : T extends Fields
   ? Item<T, never>
   : never
@@ -82,8 +82,6 @@ export type ItemUpdate<
 > = NonNullable<U['set']> & { $remove?: U['remove'] }
 
 // generic helper types
-
-export type NonEmpty<T> = [T, ...T[]]
 
 export type AtLeastOne<T, Keys extends keyof T = keyof T> = Pick<
   T,

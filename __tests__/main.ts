@@ -191,10 +191,8 @@ test("can't insert different types in set", async () => {
 })
 
 test("can't insert empty set", async () => {
-  // @ts-ignore
   await expect(db.put({ id: 'emptyset', strset: [] })).rejects.toThrow()
   await db.put({ id: 'emptyset', strset: ['a', 'b'] })
-  // @ts-ignore
   await expect(db.update('emptyset', { strset: [] })).rejects.toThrow()
 })
 
