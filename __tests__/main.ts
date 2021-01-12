@@ -50,15 +50,15 @@ test('batch get exceed size limit', async () => {
   ).resolves.toEqual(items)
 })
 
-// insert
+// put
 
-test('insert item', async () =>
+test('put item', async () =>
   await expect(db.put({ id: 'put-test', data: 'a' })).resolves.toBeUndefined())
 
-test('insert item (overwrite)', async () =>
+test('put item (overwrite)', async () =>
   await expect(db.put({ id: 'put-test', data: 'b' })).resolves.toBeUndefined())
 
-test('insert item (return new)', async () =>
+test('put item (return new)', async () =>
   await expect(
     db.put({ id: 'put-test', data: 'c' }).returning('NEW')
   ).resolves.toEqual({
@@ -66,7 +66,7 @@ test('insert item (return new)', async () =>
     data: 'c',
   }))
 
-test('insert item (return old)', async () =>
+test('put item (return old)', async () =>
   await expect(
     db.put({ id: 'put-test', data: 'd' }).returning('OLD')
   ).resolves.toEqual({
@@ -74,16 +74,11 @@ test('insert item (return old)', async () =>
     data: 'c',
   }))
 
-test('insert item (invalid return)', () => {
+test('put item (invalid return)', () => {
   expect(() => db.put({ id: 'asdf' }).returning('UPDATED_NEW' as any)).toThrow()
 })
 
-test('is typescript promise', async () => {
-  const v = await db.put({ id: ranId() }).returning('NEW')
-  await Promise.all([db.put({ id: ranId() })])
-})
-
-test('insert nested map', async () => {
+test('put nested map', async () => {
   const id = ranId()
   const obj = { id, map: { nested: { str: 'foo' } } } as const
   await expect(db.put(obj).returning('NEW')).resolves.toEqual(obj)
@@ -211,7 +206,7 @@ test('delete attribute', async () => {
   await expect(db.get(obj.id)).resolves.toEqual(obj)
 })
 
-// // sets & lists
+// sets & lists
 
 test('insert string set', async () => {
   const item = { id: 'strset', strset: ['a', 'b'] } as const
@@ -298,3 +293,10 @@ test('nested cast', async () => {
 //     abc: ['a', 'b', 'd'],
 //   })
 // })
+
+// misc
+
+test('is typescript promise', async () => {
+  await db.put({ id: ranId() }).returning('NEW')
+  await Promise.all([db.put({ id: ranId() })])
+})

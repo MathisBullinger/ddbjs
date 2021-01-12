@@ -6,7 +6,7 @@ import type { Fields, DBItem } from '../types'
 
 type ReturnType = 'NONE' | 'NEW' | 'OLD'
 
-export default class PutChain<
+export class PutChain<
   T extends Fields,
   R extends ReturnType,
   F = R extends 'NONE' ? undefined : DBItem<T>

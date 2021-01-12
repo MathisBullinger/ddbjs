@@ -1,5 +1,4 @@
 import BaseChain from './base'
-import type * as AWS from 'aws-sdk'
 import { decode } from '../utils/convert'
 import type { Fields, DBItem } from '../types'
 
@@ -8,10 +7,7 @@ const batch = <T>(arr: T[], batchSize: number): T[][] =>
     .fill(0)
     .map((_, i) => arr.slice(i * batchSize, (i + 1) * batchSize))
 
-export default class BatchGetChain<T extends Fields> extends BaseChain<
-  DBItem<T>[],
-  T
-> {
+export class BatchGetChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
   constructor(
     fields: T,
     client: AWS.DynamoDB.DocumentClient,

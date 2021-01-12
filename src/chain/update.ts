@@ -11,7 +11,7 @@ type UpdateOpts = {
   key: any
 }
 
-export default class UpdateChain<
+export class UpdateChain<
   T extends Schema<F>,
   RT extends ReturnType,
   F extends Fields = Omit<T, 'key'>,

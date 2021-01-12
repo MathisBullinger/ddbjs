@@ -6,7 +6,7 @@ import type { Fields, DBItem } from '../types'
 
 type ReturnType = 'NONE' | 'OLD'
 
-export default class DeletionChain<
+export class DeletionChain<
   T extends Fields,
   R extends ReturnType,
   F = R extends 'NONE' ? undefined : DBItem<T>

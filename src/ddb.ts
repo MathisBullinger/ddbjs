@@ -1,6 +1,11 @@
 import * as AWS from 'aws-sdk'
-import { PutChain, DeletionChain, UpdateChain, BatchGetChain } from './chain'
-import { decode } from './utils/convert'
+import {
+  PutChain,
+  DeletionChain,
+  UpdateChain,
+  BatchGetChain,
+  GetChain,
+} from './chain'
 import type {
   Schema,
   Fields,
@@ -40,19 +45,8 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     ) as F
   }
 
-  public async get(
-    ...key: KeyValue<T, F>
-  ): Promise<Item<F, T['key']> | undefined> {
-    const { Item } = await this.client
-      .get({
-        TableName: this.table,
-        Key: this.key(...key),
-      })
-      .promise()
-
-    if (!Item) return
-
-    return decode(Item) as Item<F, T['key']>
+  public get(...key: KeyValue<T, F>): GetChain<F> {
+    return new GetChain(this.fields, this.client, this.table, this.key(...key))
   }
 
   public batchGet(...keys: FlatKeyValue<T, F>[]): BatchGetChain<F> {
