@@ -11,6 +11,45 @@ test('get existing item', async () =>
     data: 'something',
   }))
 
+// batch get
+
+test('batch get', async () => {
+  const items = Array(110)
+    .fill(0)
+    .map((_, i) => ({ id: `batch-${i}` }))
+  await Promise.all(items.map(v => db.put(v)))
+
+  await expect(
+    db.batchGet(...items.slice(0, 10).map(({ id }) => id)).sort()
+  ).resolves.toEqual(items.slice(0, 10))
+
+  await expect(
+    db.batchGet(...items.map(({ id }) => id)).sort()
+  ).resolves.toEqual(items)
+
+  await expect(
+    db.batchGet('batch-1', ranId(), 'batch-2').sort()
+  ).resolves.toEqual([{ id: 'batch-1' }, { id: 'batch-2' }])
+})
+
+test('batch get exceed size limit', async () => {
+  const kb350 = 'a'.repeat(350 * 2 ** 10)
+  const items = Array(110)
+    .fill(0)
+    .map((_, i) => ({ id: `batch-${i}`, kb350 }))
+  await Promise.all(items.map(v => db.put(v)))
+
+  const a = items.slice(0, 10)
+  await expect(db.batchGet(...a.map(({ id }) => id)).sort()).resolves.toEqual(a)
+
+  const b = items.slice(0, 80)
+  await expect(db.batchGet(...b.map(({ id }) => id)).sort()).resolves.toEqual(b)
+
+  await expect(
+    db.batchGet(...items.map(({ id }) => id)).sort()
+  ).resolves.toEqual(items)
+})
+
 // insert
 
 test('insert item', async () =>

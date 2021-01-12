@@ -1,5 +1,5 @@
 import * as AWS from 'aws-sdk'
-import { PutChain, DeletionChain, UpdateChain } from './chain'
+import { PutChain, DeletionChain, UpdateChain, BatchGetChain } from './chain'
 import { decode } from './utils/convert'
 import type {
   Schema,
@@ -53,6 +53,17 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     if (!Item) return
 
     return decode(Item) as Item<F, T['key']>
+  }
+
+  public batchGet(...keys: FlatKeyValue<T, F>[]): BatchGetChain<F> {
+    return new BatchGetChain(
+      this.fields,
+      this.client,
+      this.table,
+      keys.map(key =>
+        this.key(...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>))
+      )
+    )
   }
 
   public put<I extends Item<F, T['key']>>(item: I): PutChain<F, 'NONE'> {
