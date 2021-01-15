@@ -11,7 +11,7 @@ npm install idb
 Then, using a bundler like Webpack or Rollup, import like this:
 
 ```js
-import { DDB } from 'sane-ddb'
+import { DDB } from 'ddbjs'
 
 const db = new DDB(…)
 ```
