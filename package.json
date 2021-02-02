@@ -6,7 +6,7 @@
   "types": "lib/index.d.ts",
   "scripts": {
     "build": "rm -rf lib && tsc -p tsconfig.prod.json",
-    "test": "jest --config jestconfig.json",
+    "test": "node --max-old-space-size=8192 node_modules/jest/bin/jest --config jestconfig.json",
     "prepare": "npm run build",
     "postversion": "git push --follow-tags"
   },

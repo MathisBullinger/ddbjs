@@ -1,12 +1,8 @@
 import BaseChain from './base'
 import { decode } from '../utils/convert'
 import * as expr from '../expression'
+import { batch } from '../utils/array'
 import type { Schema, Fields, DBItem } from '../types'
-
-const batch = <T>(arr: T[], batchSize: number): T[][] =>
-  Array(Math.ceil(arr.length / batchSize))
-    .fill(0)
-    .map((_, i) => arr.slice(i * batchSize, (i + 1) * batchSize))
 
 export class BatchGetChain<
   T extends Schema<F>,

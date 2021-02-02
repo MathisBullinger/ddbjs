@@ -5,6 +5,7 @@ import {
   UpdateChain,
   BatchGetChain,
   GetChain,
+  BatchDeleteChain,
 } from './chain'
 import type {
   Schema,
@@ -74,6 +75,17 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
       Key: this.key(...key),
     }
     return new DeletionChain(this.fields, this.client, params, 'NONE')
+  }
+
+  public batchDelete(...keys: FlatKeyValue<T, F>[]): BatchDeleteChain<T> {
+    return new BatchDeleteChain(
+      this.schema,
+      this.client,
+      this.table,
+      keys.map(key =>
+        this.key(...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>))
+      )
+    )
   }
 
   public update<U extends ItemUpdate<T, F>>(

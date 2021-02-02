@@ -154,6 +154,29 @@ test('delete and return', async () => {
   await expect(db.delete('delnone').returning('OLD')).resolves.toBeUndefined()
 })
 
+// batch delete
+
+test('batch delete', async () => {
+  const items = Array(120)
+    .fill(0)
+    .map((_, i) => ({ id: `batch-d-${i}` }))
+  await Promise.all(items.map(item => db.put(item)))
+
+  await expect(
+    db.batchGet(...items.map(({ id }) => id)).sort()
+  ).resolves.toEqual(items)
+
+  await db.batchDelete(...items.splice(10, 10).map(({ id }) => id))
+  await expect(
+    db.batchGet(...items.map(({ id }) => id)).sort()
+  ).resolves.toEqual(items)
+
+  await db.batchDelete(...items.splice(5, 101).map(({ id }) => id))
+  await expect(
+    db.batchGet(...items.map(({ id }) => id)).sort()
+  ).resolves.toEqual(items)
+})
+
 // update
 
 test('update item', async () => {
