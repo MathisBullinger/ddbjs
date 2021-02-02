@@ -1,5 +1,7 @@
 import { db, ranId } from './utils/db'
 
+jest.setTimeout(20000)
+
 // get
 
 test('get non-existent item', async () =>
