@@ -74,6 +74,7 @@ export type UpdateInput<
   set?: Record<string, any> & TI
   remove?: string[]
   add?: Record<string, string[] | number[]>
+  delete?: Record<string, string[] | number[]>
 }
 
 export type ItemUpdate<
@@ -83,6 +84,7 @@ export type ItemUpdate<
 > = NonNullable<U['set']> & {
   $remove?: U['remove']
   $add?: U['add']
+  $delete?: U['delete']
 }
 
 // generic helper types

@@ -366,7 +366,7 @@ test('nested cast', async () => {
 
 // set manipulation
 
-test('add to set', async () => {
+test('add & remove from set', async () => {
   const id = ranId()
   await db.put({ id, strset: ['a'] })
 
@@ -388,6 +388,25 @@ test('add to set', async () => {
       .update(ranId(), { $add: { strset: ['a', 'b'], nums: [1, 2] } })
       .returning('NEW')
   ).resolves.toMatchObject({ strset: ['a', 'b'], nums: [1, 2] })
+
+  await expect(
+    db.update(id, { $delete: { strset: ['d', 'e'] } }).returning('NEW')
+  ).resolves.toMatchObject({ strset: ['a', 'b', 'c'] })
+
+  await expect(
+    db
+      .update(id)
+      .delete({ strset: ['c'] })
+      .returning('NEW')
+  ).resolves.toMatchObject({ strset: ['a', 'b'] })
+
+  await expect(
+    db
+      .update(id)
+      .add({ nums: [1, 2, 3] })
+      .delete({ strset: ['b'] })
+      .returning('NEW')
+  ).resolves.toMatchObject({ strset: ['a'], nums: [1, 2, 3] })
 })
 
 // misc

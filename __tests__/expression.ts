@@ -39,6 +39,13 @@ test('add expr', () => {
   })
 })
 
+test('delete expr', () => {
+  expect(expr.del({ nums: [1, 2] })).toEqual({
+    UpdateExpression: 'DELETE nums :d0',
+    ExpressionAttributeValues: { ':d0': [1, 2] },
+  })
+})
+
 test('projection expr', () => {
   expect(expr.project('a', 'b', 'c')).toEqual({
     ProjectionExpression: 'a, b, c',

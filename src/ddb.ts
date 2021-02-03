@@ -96,6 +96,8 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     delete update?.$remove
     const add = update?.$add
     delete update?.$add
+    const del = update?.$delete
+    delete update?.$delete
 
     return new UpdateChain(this.fields, this.client, {
       table: this.table,
@@ -105,6 +107,7 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
       set: update,
       remove,
       add,
+      delete: del,
     })
   }
 

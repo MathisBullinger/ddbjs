@@ -48,6 +48,10 @@ export class UpdateChain<
         build.add(
           this.update.add &&
             mapValues(this.update.add, v => this.client.createSet(v))
+        ),
+        build.del(
+          this.update.delete &&
+            mapValues(this.update.delete, v => this.client.createSet(v))
         )
       )
     )
@@ -86,6 +90,14 @@ export class UpdateChain<
   ): UpdateChain<T, RT, F, RV> {
     const update = this.update
     update.add = { ...update.add, ...fields }
+    return this.clone(this.fields, update)
+  }
+
+  delete(
+    fields: Exclude<UpdateInput<T, F>['delete'], null>
+  ): UpdateChain<T, RT, F, RV> {
+    const update = this.update
+    update.delete = { ...update.delete, ...fields }
     return this.clone(this.fields, update)
   }
 

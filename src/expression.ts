@@ -58,6 +58,8 @@ export const set = buildPairExpr('SET', '=')
 
 export const add = buildPairExpr('ADD')
 
+export const del = buildPairExpr('DELETE')
+
 const escape = <T extends 'UpdateExpression' | 'ProjectionExpression'>(
   prefix: string,
   field: T,
