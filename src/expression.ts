@@ -22,9 +22,11 @@ const build = <T extends Expression>(expr: T): T => {
   return result
 }
 
-export const set = (
-  input?: Record<string, any>
-): UpdateExpression | undefined => {
+const buildPairExpr = <T = any>(
+  verb: string,
+  joiner = ' ',
+  prefix = verb[0].toLowerCase()
+) => (input?: Record<string, T>): UpdateExpression | undefined => {
   if (!input || !Object.keys(input).length) return
 
   const pairs: [string, string][] = []
@@ -35,10 +37,10 @@ export const set = (
 
   for (let i = 0; i < entries.length; i++) {
     const [key, value] = entries[i]
-    const av = `:s${i}`
+    const av = `:${prefix}${i}`
     let name = key
     if (!naming.valid(name)) {
-      name = `#s${Object.keys(ExpressionAttributeNames).length}`
+      name = `#${prefix}${Object.keys(ExpressionAttributeNames).length}`
       ExpressionAttributeNames[name] = key
     }
     pairs.push([name, av])
@@ -46,11 +48,15 @@ export const set = (
   }
 
   return build({
-    UpdateExpression: 'SET ' + pairs.map(v => v.join('=')).join(', '),
+    UpdateExpression: `${verb} ${pairs.map(v => v.join(joiner)).join(', ')}`,
     ExpressionAttributeValues,
     ExpressionAttributeNames,
   })
 }
+
+export const set = buildPairExpr('SET', '=')
+
+export const add = buildPairExpr('ADD')
 
 const escape = <T extends 'UpdateExpression' | 'ProjectionExpression'>(
   prefix: string,

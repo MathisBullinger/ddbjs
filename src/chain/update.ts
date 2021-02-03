@@ -2,6 +2,7 @@ import BaseChain from './base'
 import * as build from '../expression'
 import { decode } from '../utils/convert'
 import type { Fields, Schema, DBItem, UpdateInput } from '../types'
+import { mapValues } from '../utils/object'
 
 type ReturnType = 'NONE' | 'OLD' | 'NEW' | 'UPDATED_OLD' | 'UPDATED_NEW'
 
@@ -43,7 +44,11 @@ export class UpdateChain<
       params,
       build.merge(
         build.set(this.update.set),
-        build.remove(...(this.update.remove ?? []))
+        build.remove(...(this.update.remove ?? [])),
+        build.add(
+          this.update.add &&
+            mapValues(this.update.add, v => this.client.createSet(v))
+        )
       )
     )
 
@@ -73,13 +78,15 @@ export class UpdateChain<
   remove(...fields: string[]): UpdateChain<T, RT, F, RV> {
     const update = this.update
     update.remove = [...(update.remove ?? []), ...fields]
+    return this.clone(this.fields, update)
+  }
 
-    return new UpdateChain(
-      this.fields,
-      this.client,
-      this.update,
-      this.returnType
-    )
+  add(
+    fields: Exclude<UpdateInput<T, F>['add'], null>
+  ): UpdateChain<T, RT, F, RV> {
+    const update = this.update
+    update.add = { ...update.add, ...fields }
+    return this.clone(this.fields, update)
   }
 
   returning<R extends ReturnType>(v: R): UpdateChain<T, R, F> {
@@ -105,12 +112,7 @@ export class UpdateChain<
 
   public cast = super._cast.bind(this)
 
-  protected clone(fields = this.fields) {
-    return new UpdateChain(
-      fields,
-      this.client,
-      this.update,
-      this.returnType
-    ) as any
+  protected clone(fields = this.fields, update = this.update) {
+    return new UpdateChain(fields, this.client, update, this.returnType) as any
   }
 }

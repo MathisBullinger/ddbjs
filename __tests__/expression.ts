@@ -32,6 +32,13 @@ test('remove reserved key', () => {
   })
 })
 
+test('add expr', () => {
+  expect(expr.add({ alpha: ['a', 'b'] })).toEqual({
+    UpdateExpression: `ADD alpha :a0`,
+    ExpressionAttributeValues: { ':a0': ['a', 'b'] },
+  })
+})
+
 test('projection expr', () => {
   expect(expr.project('a', 'b', 'c')).toEqual({
     ProjectionExpression: 'a, b, c',

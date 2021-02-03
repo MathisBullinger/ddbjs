@@ -364,6 +364,32 @@ test('nested cast', async () => {
 //   })
 // })
 
+// set manipulation
+
+test('add to set', async () => {
+  const id = ranId()
+  await db.put({ id, strset: ['a'] })
+
+  await expect(db.get(id)).resolves.toMatchObject({ strset: ['a'] })
+
+  await expect(
+    db.update(id, { $add: { strset: ['b', 'c'] } }).returning('NEW')
+  ).resolves.toMatchObject({ strset: ['a', 'b', 'c'] })
+
+  await expect(
+    db
+      .update(id)
+      .add({ strset: ['d', 'e'] })
+      .returning('NEW')
+  ).resolves.toMatchObject({ strset: ['a', 'b', 'c', 'd', 'e'] })
+
+  await expect(
+    db
+      .update(ranId(), { $add: { strset: ['a', 'b'], nums: [1, 2] } })
+      .returning('NEW')
+  ).resolves.toMatchObject({ strset: ['a', 'b'], nums: [1, 2] })
+})
+
 // misc
 
 test('is typescript promise', async () => {

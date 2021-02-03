@@ -73,13 +73,17 @@ export type UpdateInput<
 > = {
   set?: Record<string, any> & TI
   remove?: string[]
+  add?: Record<string, string[] | number[]>
 }
 
 export type ItemUpdate<
   T extends Schema<F>,
   F extends Fields = Omit<T, 'key'>,
   U extends UpdateInput<T, F> = UpdateInput<T, F>
-> = NonNullable<U['set']> & { $remove?: U['remove'] }
+> = NonNullable<U['set']> & {
+  $remove?: U['remove']
+  $add?: U['add']
+}
 
 // generic helper types
 
