@@ -1,10 +1,11 @@
 import * as AWS from 'aws-sdk'
 import {
+  GetChain,
   PutChain,
   DeletionChain,
   UpdateChain,
   BatchGetChain,
-  GetChain,
+  BatchPutChain,
   BatchDeleteChain,
 } from './chain'
 import type {
@@ -67,6 +68,10 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
       Item: item,
     }
     return new PutChain(this.fields, this.client, params)
+  }
+
+  public batchPut(...items: Item<F, T['key']>[]): BatchPutChain<T, F> {
+    return new BatchPutChain(this.schema, this.client, this.table, items)
   }
 
   public delete(...key: KeyValue<T, F>): DeletionChain<F, 'NONE'> {

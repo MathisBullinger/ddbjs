@@ -140,6 +140,20 @@ test('set in map', async () => {
   await expect(db.put(item).returning('NEW')).resolves.toEqual(item)
 })
 
+// batch put
+
+test('batch put', async () => {
+  const items = Array(120)
+    .fill(0)
+    .map((_, i) => ({ id: `batch-p-${i}` }))
+
+  await db.batchPut(...items)
+
+  await expect(
+    db.batchGet(...items.map(({ id }) => id)).sort()
+  ).resolves.toEqual(items)
+})
+
 // delete
 
 test('delete item', async () => {
