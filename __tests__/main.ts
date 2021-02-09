@@ -136,7 +136,7 @@ test('set in map', async () => {
     db.put({ id: ranId(), map: { set: ['a', 'a'] } })
   ).rejects.toThrow()
 
-  const item = { id: ranId(), map: { set: ['a', 'b'] } } as const
+  const item = { id: ranId(), map: { set: ['a', 'b'] } }
   await expect(db.put(item).returning('NEW')).resolves.toEqual(item)
 })
 
@@ -293,7 +293,7 @@ test('delete attribute', async () => {
 // sets & lists
 
 test('insert string set', async () => {
-  const item = { id: 'strset', strset: ['a', 'b'] } as const
+  const item = { id: 'strset', strset: ['a', 'b'] }
   await expect(db.put(item).returning('NEW')).resolves.toEqual(item)
   await expect(db.get(item.id)).resolves.toEqual(item)
 })

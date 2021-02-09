@@ -30,7 +30,7 @@ export type SchemaValue<
   : T extends []
   ? any[]
   : T extends any[]
-  ? Readonly<PrimitiveConstructorType<T[number]>[]>
+  ? PrimitiveConstructorType<T[number]>[]
   : T extends Fields
   ? Item<T, never>
   : never
