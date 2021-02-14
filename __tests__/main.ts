@@ -1,5 +1,5 @@
 import { db, ranId } from './utils/db'
-import type { Record } from '../src/ddb'
+import type { DBRecord } from '../src/ddb'
 
 jest.setTimeout(20000)
 
@@ -432,5 +432,9 @@ test('is typescript promise', async () => {
 })
 
 test('Record type', () => {
-  const record: Record<typeof db> = { id: 'a', strset: ['b', 'c'], bool: false }
+  const record: DBRecord<typeof db> = {
+    id: 'a',
+    strset: ['b', 'c'],
+    bool: false,
+  }
 })
