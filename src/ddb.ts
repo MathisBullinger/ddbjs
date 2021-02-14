@@ -125,3 +125,7 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     )
   }
 }
+
+export type Record<T extends DDB<any, any>> = T extends DDB<infer S, infer F>
+  ? Item<F, S['key']>
+  : never

@@ -1,4 +1,5 @@
 import { db, ranId } from './utils/db'
+import type { Record } from '../src/ddb'
 
 jest.setTimeout(20000)
 
@@ -428,4 +429,8 @@ test('add & remove from set', async () => {
 test('is typescript promise', async () => {
   await db.put({ id: ranId() }).returning('NEW')
   await Promise.all([db.put({ id: ranId() })])
+})
+
+test('Record type', () => {
+  const record: Record<typeof db> = { id: 'a', strset: ['b', 'c'], bool: false }
 })
