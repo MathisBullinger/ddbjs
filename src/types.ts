@@ -2,7 +2,10 @@ export type Schema<T extends Fields> = T & Readonly<{ key: Key<T> }>
 
 export type Fields = Readonly<Record<string, SchemaValueType>>
 
-export type PrimitiveConstructor = StringConstructor | NumberConstructor
+export type PrimitiveConstructor =
+  | StringConstructor
+  | NumberConstructor
+  | BooleanConstructor
 
 export type SchemaValueType =
   | PrimitiveConstructor
@@ -103,7 +106,11 @@ export type NotEmptyObj<T extends Record<string, any>> = keyof T extends never
 
 export type PrimitiveConstructorType<
   T extends PrimitiveConstructor
-> = T extends StringConstructor ? string : number
+> = T extends StringConstructor
+  ? string
+  : T extends NumberConstructor
+  ? number
+  : boolean
 
 export type ExplTypes<T extends Record<string, any>> = {
   [K in keyof T]?: 'Set' | 'List'

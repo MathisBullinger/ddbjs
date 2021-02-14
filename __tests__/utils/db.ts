@@ -25,6 +25,8 @@ export const db = new DDB(
     key: 'id',
     id: String,
     data: String,
+    num: Number,
+    bool: Boolean,
     strset: [String],
     list: [],
     abc: [],
