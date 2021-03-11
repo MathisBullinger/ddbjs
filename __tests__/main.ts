@@ -291,6 +291,26 @@ test('delete attribute', async () => {
   await expect(db.get(obj.id)).resolves.toEqual(obj)
 })
 
+// update number
+
+test('add to number', async () => {
+  await expect(
+    db.put({ id: 'count', num: 1 }).returning('NEW')
+  ).resolves.toMatchObject({ num: 1 })
+
+  await expect(
+    db.update('count').add({ num: 1 }).returning('UPDATED_NEW')
+  ).resolves.toEqual({ num: 2 })
+
+  await expect(
+    db.update('count', { $add: { num: 2 } }).returning('UPDATED_NEW')
+  ).resolves.toEqual({ num: 4 })
+
+  await expect(
+    db.update('count').add({ num: -3 }).returning('UPDATED_NEW')
+  ).resolves.toEqual({ num: 1 })
+})
+
 // sets & lists
 
 test('insert string set', async () => {

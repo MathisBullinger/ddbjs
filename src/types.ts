@@ -76,7 +76,7 @@ export type UpdateInput<
 > = {
   set?: Record<string, any> & TI
   remove?: string[]
-  add?: Record<string, string[] | number[]>
+  add?: Record<string, string[] | number[] | number>
   delete?: Record<string, string[] | number[]>
 }
 

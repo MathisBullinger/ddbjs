@@ -47,7 +47,9 @@ export class UpdateChain<
         build.remove(...(this.update.remove ?? [])),
         build.add(
           this.update.add &&
-            mapValues(this.update.add, v => this.client.createSet(v))
+            mapValues(this.update.add, v =>
+              Array.isArray(v) ? this.client.createSet(v) : v
+            )
         ),
         build.del(
           this.update.delete &&
