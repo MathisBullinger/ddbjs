@@ -14,14 +14,28 @@ export class PutChain<
   constructor(
     fields: T,
     client: AWS.DynamoDB.DocumentClient,
+    private readonly keyFields: string[],
     private readonly params: AWS.DynamoDB.DocumentClient.PutItemInput,
-    private readonly returnType: ReturnType = 'NONE'
+    private readonly returnType: ReturnType = 'NONE',
+    private readonly existCheck = false
   ) {
     super(fields, client)
   }
 
   async execute() {
     this.params.Item = this.makeSets(this.params.Item)
+
+    if (this.existCheck) {
+      const conditions: string[] = []
+      for (const k of this.keyFields) {
+        const name = `:${k}`
+        ;(this.params.ExpressionAttributeValues ??= {})[
+          name
+        ] = this.params.Item[k]
+        conditions.push(`${k}<>${name}`)
+      }
+      this.params.ConditionExpression = conditions.join(' AND ')
+    }
 
     const { Attributes } = await this.client
       .put({
@@ -45,17 +59,29 @@ export class PutChain<
 
   returning<R extends ReturnType>(v: R): PutChain<T, R> {
     assert(oneOf(v, 'NEW', 'OLD', 'NONE'), new ReturnValueError(v, 'insert'))
-    return new PutChain(this.fields, this.client, this.params, v)
+    return new PutChain(
+      this.fields,
+      this.client,
+      this.keyFields,
+      this.params,
+      v
+    )
+  }
+
+  public ifNotExists(): PutChain<T, R> {
+    return this.clone(this.fields, true)
   }
 
   public cast = super._cast.bind(this)
 
-  protected clone(fields = this.fields) {
+  protected clone(fields = this.fields, existsCheck?: boolean) {
     return new PutChain(
       fields,
       this.client,
+      this.keyFields,
       this.params,
-      this.returnType
+      this.returnType,
+      existsCheck
     ) as any
   }
 }

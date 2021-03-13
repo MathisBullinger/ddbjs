@@ -141,6 +141,11 @@ test('set in map', async () => {
   await expect(db.put(item).returning('NEW')).resolves.toEqual(item)
 })
 
+test('put (if not exists)', async () => {
+  await expect(db.put({ id: 'locked' }).ifNotExists()).resolves.not.toThrow()
+  await expect(db.put({ id: 'locked' }).ifNotExists()).rejects.toThrow()
+})
+
 // batch put
 
 test('batch put', async () => {

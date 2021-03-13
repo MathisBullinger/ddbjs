@@ -67,7 +67,7 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
       TableName: this.table,
       Item: item,
     }
-    return new PutChain(this.fields, this.client, params)
+    return new PutChain(this.fields, this.client, this.keyFields, params)
   }
 
   public batchPut(...items: Item<F, T['key']>[]): BatchPutChain<T, F> {
@@ -116,13 +116,14 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     })
   }
 
+  private get keyFields(): string[] {
+    return typeof this.schema.key === 'string'
+      ? [this.schema.key]
+      : (this.schema.key as string[])
+  }
+
   private key(...v: KeyValue<T, F>) {
-    return Object.fromEntries(
-      (typeof this.schema.key === 'string'
-        ? [this.schema.key]
-        : (this.schema.key as string[])
-      ).map((k, i) => [k, v[i]])
-    )
+    return Object.fromEntries(this.keyFields.map((k, i) => [k, v[i]]))
   }
 }
 
