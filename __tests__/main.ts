@@ -21,6 +21,13 @@ test('get select fields', async () => {
   await expect(db.get(id).select('data')).resolves.toEqual({ data: 'foo' })
 })
 
+test('get (strongly consistent)', async () => {
+  const obj = { id: ranId(), foo: 'bar' }
+  await db.put(obj)
+  await expect(db.get(obj.id)).resolves.toEqual(obj)
+  await expect(db.get(obj.id).strong()).resolves.toEqual(obj)
+})
+
 // batch get
 
 test('batch get', async () => {

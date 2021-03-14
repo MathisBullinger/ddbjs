@@ -9,7 +9,8 @@ export class GetChain<T extends Fields> extends BaseChain<DBItem<T>, T> {
     client: AWS.DynamoDB.DocumentClient,
     private readonly table: string,
     private readonly key: any,
-    private readonly selected?: string[]
+    private readonly selected?: string[],
+    private readonly consistent = false
   ) {
     super(fields, client)
   }
@@ -18,6 +19,7 @@ export class GetChain<T extends Fields> extends BaseChain<DBItem<T>, T> {
     const params: Partial<AWS.DynamoDB.GetItemInput> = {
       TableName: this.table,
       Key: this.key,
+      ConsistentRead: this.consistent,
     }
 
     Object.assign(params, expr.project(...(this.selected ?? [])))
@@ -31,13 +33,22 @@ export class GetChain<T extends Fields> extends BaseChain<DBItem<T>, T> {
     return this.clone(this.fields, fields)
   }
 
-  protected clone(fields = this.fields, selected?: string[]): this {
+  public strong(): this {
+    return this.clone(this.fields, this.selected, true)
+  }
+
+  protected clone(
+    fields = this.fields,
+    selected?: string[],
+    consistent = this.consistent
+  ): this {
     return new GetChain(
       fields,
       this.client,
       this.table,
       this.key,
-      selected
+      selected,
+      consistent
     ) as any
   }
 }
