@@ -153,6 +153,10 @@ test('put (if not exists)', async () => {
   await expect(db.put({ id: 'locked' }).ifNotExists()).rejects.toThrow()
 })
 
+test('put null', async () => {
+  await expect(db.put({ id: ranId(), abc: null as any })).resolves.not.toThrow()
+})
+
 // batch put
 
 test('batch put', async () => {
