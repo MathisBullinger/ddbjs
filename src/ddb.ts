@@ -16,6 +16,7 @@ import type {
   Item,
   ItemUpdate,
   FlatKeyValue,
+  DBItem,
 } from './types'
 
 export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
@@ -46,6 +47,7 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     this.fields = Object.fromEntries(
       Object.entries(schema).filter(([k]) => k !== 'key')
     ) as F
+    this.keyValue = this.keyValue.bind(this)
   }
 
   public get(...key: KeyValue<T, F>): GetChain<F> {
@@ -89,7 +91,7 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
       this.client,
       this.table,
       keys.map(key =>
-        this.key(...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>))
+        this.key(...((Array.isArray(key) ? key : [key]) as KeyValue<T, F>))
       )
     )
   }
@@ -121,6 +123,11 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     return new ScanChain(this.fields, this.client, this.table)
   }
 
+  public async truncate() {
+    const items = await this.scan().select(...this.keyFields)
+    await this.batchDelete(...items.map(this.keyValue))
+  }
+
   private get keyFields(): string[] {
     return typeof this.schema.key === 'string'
       ? [this.schema.key]
@@ -129,6 +136,11 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
 
   private key(...v: KeyValue<T, F>) {
     return Object.fromEntries(this.keyFields.map((k, i) => [k, v[i]]))
+  }
+
+  private keyValue(obj: DBItem<F>): FlatKeyValue<T, F> {
+    const [h, s] = this.keyFields.map(k => obj[k])
+    return s !== undefined ? [h, s] : h
   }
 }
 

@@ -467,7 +467,7 @@ const count = async ({ client, table }: any = db) => {
   return Count
 }
 
-test('scan', async () => {
+test('scan & truncate', async () => {
   await expect(count(scanDB)).resolves.toBe(0)
 
   const items = [...Array(10).keys()].map(id => ({ id }))
@@ -502,6 +502,11 @@ test('scan', async () => {
       .select('id')
       .then(res => new Set(res.flatMap(v => Object.keys(v))))
   ).resolves.toEqual(new Set(['id']))
+
+  // truncate
+  await expect(count(scanDB)).resolves.toBeGreaterThan(0)
+  await expect(scanDB.truncate()).resolves.not.toThrow()
+  await expect(count(scanDB)).resolves.toBe(0)
 })
 
 // misc
