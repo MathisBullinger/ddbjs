@@ -1,5 +1,6 @@
 import BaseChain from './base'
 import { decode } from '../utils/convert'
+import * as expr from '../expression'
 import type { Fields, DBItem } from '../types'
 
 export class ScanChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
@@ -7,7 +8,8 @@ export class ScanChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
     fields: T,
     client: AWS.DynamoDB.DocumentClient,
     private readonly table: string,
-    private readonly _limit?: number
+    private readonly _limit?: number,
+    private readonly selected?: string[]
   ) {
     super(fields, client)
   }
@@ -17,6 +19,8 @@ export class ScanChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
       TableName: this.table,
       Limit: this._limit,
     }
+    Object.assign(params, expr.project(...(this.selected ?? [])))
+
     const items: any[] = []
 
     do {
@@ -35,7 +39,21 @@ export class ScanChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
     return this.clone(this.fields, n)
   }
 
-  protected clone(fields = this.fields, limit = this._limit): this {
-    return new ScanChain(fields, this.client, this.table, limit) as any
+  public select(...fields: string[]): this {
+    return this.clone(this.fields, this._limit, fields)
+  }
+
+  protected clone(
+    fields = this.fields,
+    limit = this._limit,
+    selected = this.selected
+  ): this {
+    return new ScanChain(
+      fields,
+      this.client,
+      this.table,
+      limit,
+      selected
+    ) as any
   }
 }

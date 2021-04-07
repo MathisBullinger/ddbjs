@@ -467,7 +467,7 @@ const count = async ({ client, table }: any = db) => {
   return Count
 }
 
-test.only('scan', async () => {
+test('scan', async () => {
   await expect(count(scanDB)).resolves.toBe(0)
 
   const items = [...Array(10).keys()].map(id => ({ id }))
@@ -490,6 +490,18 @@ test.only('scan', async () => {
     expect(res.length).toBe(limit)
     expect(items).toEqual(expect.arrayContaining(res))
   }
+
+  // projection
+  await expect(
+    scanDB.scan().then(res => new Set(res.flatMap(v => Object.keys(v))))
+  ).resolves.toEqual(new Set(['id', 'payload']))
+
+  await expect(
+    scanDB
+      .scan()
+      .select('id')
+      .then(res => new Set(res.flatMap(v => Object.keys(v))))
+  ).resolves.toEqual(new Set(['id']))
 })
 
 // misc
