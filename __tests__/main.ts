@@ -473,9 +473,9 @@ test.only('scan', async () => {
   const items = [...Array(10).keys()].map(id => ({ id }))
   await scanDB.batchPut(...items)
 
-  await expect(scanDB.scan().then(v => new Set(v))).resolves.toEqual(
-    new Set(items)
-  )
+  const wrap = (prom: Promise<any[]>) => prom.then(v => new Set(v))
+
+  await expect(wrap(scanDB.scan())).resolves.toEqual(new Set(items))
 
   const newItems = new Array(1000)
     .fill(0)
@@ -483,9 +483,13 @@ test.only('scan', async () => {
   await scanDB.batchPut(...newItems)
   items.push(...newItems)
 
-  await expect(scanDB.scan().then(v => new Set(v).size)).resolves.toEqual(
-    new Set(items).size
-  )
+  await expect(wrap(scanDB.scan())).resolves.toEqual(new Set(items))
+
+  for (let limit of [3, 900]) {
+    const res = await scanDB.scan().limit(limit)
+    expect(res.length).toBe(limit)
+    expect(items).toEqual(expect.arrayContaining(res))
+  }
 })
 
 // misc
