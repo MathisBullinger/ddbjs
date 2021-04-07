@@ -1,4 +1,4 @@
-import { db, ranId } from './utils/db'
+import { db, ranId, scanDB } from './utils/db'
 import type { DBRecord } from '../src/ddb'
 
 jest.setTimeout(20000)
@@ -458,6 +458,34 @@ test('add & remove from set', async () => {
       .delete({ strset: ['b'] })
       .returning('NEW')
   ).resolves.toMatchObject({ strset: ['a'], nums: [1, 2, 3] })
+})
+
+// scan
+
+const count = async ({ client, table }: any = db) => {
+  const { Count } = await client.scan({ TableName: table }).promise()
+  return Count
+}
+
+test.only('scan', async () => {
+  await expect(count(scanDB)).resolves.toBe(0)
+
+  const items = [...Array(10).keys()].map(id => ({ id }))
+  await scanDB.batchPut(...items)
+
+  await expect(scanDB.scan().then(v => new Set(v))).resolves.toEqual(
+    new Set(items)
+  )
+
+  const newItems = new Array(1000)
+    .fill(0)
+    .map((_, i) => ({ id: i + 10, payload: '_'.repeat(1e4) }))
+  await scanDB.batchPut(...newItems)
+  items.push(...newItems)
+
+  await expect(scanDB.scan().then(v => new Set(v).size)).resolves.toEqual(
+    new Set(items).size
+  )
 })
 
 // misc

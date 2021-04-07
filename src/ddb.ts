@@ -7,6 +7,7 @@ import {
   BatchGetChain,
   BatchPutChain,
   BatchDeleteChain,
+  ScanChain,
 } from './chain'
 import type {
   Schema,
@@ -114,6 +115,10 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
       add,
       delete: del,
     })
+  }
+
+  public scan(): ScanChain<F> {
+    return new ScanChain(this.fields, this.client, this.table)
   }
 
   private get keyFields(): string[] {

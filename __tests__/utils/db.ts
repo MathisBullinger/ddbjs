@@ -41,14 +41,19 @@ export const db = new DDB(
   opts
 )
 
+export const scanDB = new DDB(
+  `scan-${TableName}`,
+  { key: 'id', id: Number },
+  opts
+)
+
 let child: ReturnType<typeof localDynamo.launch>
 
-beforeAll(async () => {
-  child = localDynamo.launch(undefined, 4567)
+async function createTable(TableName: string, key = 'id', type = 'S') {
   await ddb
     .createTable({
-      AttributeDefinitions: [{ AttributeName: 'id', AttributeType: 'S' }],
-      KeySchema: [{ AttributeName: 'id', KeyType: 'HASH' }],
+      AttributeDefinitions: [{ AttributeName: key, AttributeType: type }],
+      KeySchema: [{ AttributeName: key, KeyType: 'HASH' }],
       ProvisionedThroughput: {
         ReadCapacityUnits: 1,
         WriteCapacityUnits: 1,
@@ -56,7 +61,14 @@ beforeAll(async () => {
       TableName,
     })
     .promise()
+}
 
+beforeAll(async () => {
+  child = localDynamo.launch(undefined, 4567)
+  await Promise.all([
+    createTable(db.table),
+    createTable(scanDB.table, 'id', 'N'),
+  ])
   await db.client
     .put({ TableName, Item: { id: 'bar', data: 'something' } })
     .promise()
@@ -64,5 +76,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await ddb.deleteTable({ TableName }).promise()
+  await ddb.deleteTable({ TableName: scanDB.table }).promise()
   child?.kill()
 })
