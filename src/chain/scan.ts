@@ -24,6 +24,7 @@ export class ScanChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
     const items: any[] = []
 
     do {
+      super.log('scan', params)
       const { Items, LastEvaluatedKey } = await this.client
         .scan(params)
         .promise()

@@ -74,6 +74,7 @@ export class UpdateChain<
 
     if (!this.isComplete(params)) throw Error('incomplete update')
 
+    super.log('update', params)
     const { Attributes } = await this.client.update(params).promise()
     const result: RV = decode(
       this.returnType === 'NONE' ? undefined : Attributes

@@ -48,15 +48,18 @@ export class BatchGetChain<
   ): Promise<any[]> {
     if (!Keys?.length) return []
 
-    const { Responses, UnprocessedKeys } = await this.client
-      .batchGet({
-        RequestItems: {
-          [this.table]: {
-            Keys,
-            ...params,
-          },
+    const payload = {
+      RequestItems: {
+        [this.table]: {
+          Keys,
+          ...params,
         },
-      })
+      },
+    }
+    super.log('batchGet', payload)
+
+    const { Responses, UnprocessedKeys } = await this.client
+      .batchGet(payload)
       .promise()
 
     return [

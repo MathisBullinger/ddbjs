@@ -23,13 +23,14 @@ export class BatchPutChain<
   private async put(items?: any[]) {
     if (!items?.length) return
 
-    const { UnprocessedItems } = await this.client
-      .batchWrite({
-        RequestItems: {
-          [this.table]: items.map(Item => ({ PutRequest: { Item } })),
-        },
-      })
-      .promise()
+    const payload = {
+      RequestItems: {
+        [this.table]: items.map(Item => ({ PutRequest: { Item } })),
+      },
+    }
+    super.log('batchWrite', payload)
+
+    const { UnprocessedItems } = await this.client.batchWrite(payload).promise()
 
     await this.put(UnprocessedItems?.[this.table])
   }

@@ -21,14 +21,15 @@ export class DeletionChain<
   }
 
   async execute() {
-    const { Attributes } = await this.client
-      .delete({
-        ...this.params,
-        ...(this.returnType === 'OLD' && {
-          ReturnValues: 'ALL_OLD',
-        }),
-      })
-      .promise()
+    const params: AWS.DynamoDB.DeleteItemInput = {
+      ...this.params,
+      ...(this.returnType === 'OLD' && {
+        ReturnValues: 'ALL_OLD',
+      }),
+    }
+    super.log('delete', params)
+
+    const { Attributes } = await this.client.delete(params).promise()
 
     const result: F = decode(
       this.returnType === 'OLD' ? Attributes : undefined

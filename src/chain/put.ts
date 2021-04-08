@@ -37,14 +37,15 @@ export class PutChain<
       this.params.ConditionExpression = conditions.join(' AND ')
     }
 
-    const { Attributes } = await this.client
-      .put({
-        ...this.params,
-        ...(this.returnType === 'OLD' && {
-          ReturnValues: 'ALL_OLD',
-        }),
-      })
-      .promise()
+    const params = {
+      ...this.params,
+      ...(this.returnType === 'OLD' && {
+        ReturnValues: 'ALL_OLD',
+      }),
+    }
+    super.log('put', params)
+
+    const { Attributes } = await this.client.put(params).promise()
 
     const result: F = decode(
       this.returnType === 'NEW'

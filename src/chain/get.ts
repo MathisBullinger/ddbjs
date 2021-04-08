@@ -21,6 +21,7 @@ export class GetChain<T extends Fields> extends BaseChain<DBItem<T>, T> {
       Key: this.key,
       ConsistentRead: this.consistent,
     }
+    super.log('get', params)
 
     Object.assign(params, expr.project(...(this.selected ?? [])))
 

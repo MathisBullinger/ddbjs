@@ -12,7 +12,8 @@ export default abstract class BaseChain<
   // @ts-ignore
   constructor(
     readonly fields: F,
-    protected readonly client: AWS.DynamoDB.DocumentClient
+    protected readonly client: AWS.DynamoDB.DocumentClient,
+    private _debug = false
   ) {
     let _resolve: any
     let _reject: any
@@ -36,6 +37,16 @@ export default abstract class BaseChain<
   }
 
   protected abstract execute(): Promise<void>
+
+  public debug(): this {
+    const newInst = this.clone()
+    newInst._debug = true
+    return newInst
+  }
+
+  protected log(method: string, params?: Record<string, any>) {
+    if (this._debug) console.log(method, params ?? '')
+  }
 
   protected static encodeKey(v: string) {
     return Buffer.from(v).toString('hex')
