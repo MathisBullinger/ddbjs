@@ -10,9 +10,10 @@ export class GetChain<T extends Fields> extends BaseChain<DBItem<T>, T> {
     private readonly table: string,
     private readonly key: any,
     private readonly selected?: string[],
-    private readonly consistent = false
+    private readonly consistent = false,
+    debug?: boolean
   ) {
-    super(fields, client)
+    super(fields, client, debug)
   }
 
   async execute() {
@@ -31,15 +32,16 @@ export class GetChain<T extends Fields> extends BaseChain<DBItem<T>, T> {
   }
 
   public select(...fields: string[]): this {
-    return this.clone(this.fields, fields)
+    return this.clone(this.fields, this._debug, fields)
   }
 
   public strong(): this {
-    return this.clone(this.fields, this.selected, true)
+    return this.clone(this.fields, this._debug, this.selected, true)
   }
 
   protected clone(
     fields = this.fields,
+    debug = this._debug,
     selected?: string[],
     consistent = this.consistent
   ): this {
@@ -49,7 +51,8 @@ export class GetChain<T extends Fields> extends BaseChain<DBItem<T>, T> {
       this.table,
       this.key,
       selected,
-      consistent
+      consistent,
+      debug
     ) as any
   }
 }

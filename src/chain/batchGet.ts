@@ -15,9 +15,10 @@ export class BatchGetChain<
     private readonly keys: any[],
     private readonly shouldSort: boolean = false,
     private readonly selected?: string[],
-    private readonly removeFields: string[] = []
+    private readonly removeFields: string[] = [],
+    debug?: boolean
   ) {
-    super(schema, client)
+    super(schema, client, debug)
   }
 
   async execute() {
@@ -39,7 +40,7 @@ export class BatchGetChain<
   }
 
   public select(...fields: string[]): this {
-    return this.clone(this.schema, this.shouldSort, fields)
+    return this.clone(this.schema, this._debug, this.shouldSort, fields)
   }
 
   private async read(
@@ -72,6 +73,7 @@ export class BatchGetChain<
     const keyFields = [this.schema.key].flat() as string[]
     return this.clone(
       this.schema,
+      this._debug,
       true,
       this.selected && [...this.selected, ...keyFields],
       this.selected && keyFields.filter(v => !this.selected!.includes(v))
@@ -109,6 +111,7 @@ export class BatchGetChain<
 
   protected clone(
     schema = this.schema,
+    debug = this._debug,
     sort = false,
     selected = this.selected,
     remove = this.removeFields
@@ -120,7 +123,8 @@ export class BatchGetChain<
       this.keys,
       sort,
       selected,
-      remove
+      remove,
+      debug
     ) as any
   }
 }

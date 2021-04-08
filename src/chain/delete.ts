@@ -15,9 +15,10 @@ export class DeletionChain<
     fields: T,
     client: AWS.DynamoDB.DocumentClient,
     private readonly params: AWS.DynamoDB.DocumentClient.DeleteItemInput,
-    private readonly returnType: ReturnType = 'NONE'
+    private readonly returnType: ReturnType = 'NONE',
+    debug?: boolean
   ) {
-    super(fields, client)
+    super(fields, client, debug)
   }
 
   async execute() {
@@ -40,15 +41,20 @@ export class DeletionChain<
 
   returning<R extends ReturnType>(v: R): DeletionChain<T, R> {
     assert(oneOf(v, 'NONE', 'OLD'), new ReturnValueError(v, 'delete'))
-    return new DeletionChain(this.fields, this.client, this.params, v)
+    return this.clone(this.fields, this._debug, v)
   }
 
-  protected clone(fields = this.fields) {
+  protected clone(
+    fields = this.fields,
+    debug = this._debug,
+    returnType = this.returnType
+  ) {
     return new DeletionChain(
       fields,
       this.client,
       this.params,
-      this.returnType
+      returnType,
+      debug
     ) as any
   }
 }

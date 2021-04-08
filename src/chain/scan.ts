@@ -9,9 +9,10 @@ export class ScanChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
     client: AWS.DynamoDB.DocumentClient,
     private readonly table: string,
     private readonly _limit?: number,
-    private readonly selected?: string[]
+    private readonly selected?: string[],
+    debug?: boolean
   ) {
-    super(fields, client)
+    super(fields, client, debug)
   }
 
   async execute() {
@@ -37,15 +38,16 @@ export class ScanChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
   }
 
   public limit(n: number): this {
-    return this.clone(this.fields, n)
+    return this.clone(this.fields, this._debug, n)
   }
 
   public select(...fields: string[]): this {
-    return this.clone(this.fields, this._limit, fields)
+    return this.clone(this.fields, this._debug, this._limit, fields)
   }
 
   protected clone(
     fields = this.fields,
+    debug = this._debug,
     limit = this._limit,
     selected = this.selected
   ): this {
@@ -54,7 +56,8 @@ export class ScanChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
       this.client,
       this.table,
       limit,
-      selected
+      selected,
+      debug
     ) as any
   }
 }

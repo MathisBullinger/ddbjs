@@ -10,9 +10,10 @@ export class BatchPutChain<
     private readonly schema: T,
     client: AWS.DynamoDB.DocumentClient,
     private readonly table: string,
-    private readonly items: Item<F, T['key']>[]
+    private readonly items: Item<F, T['key']>[],
+    debug?: boolean
   ) {
-    super(schema, client)
+    super(schema, client, debug)
   }
 
   async execute() {
@@ -35,12 +36,13 @@ export class BatchPutChain<
     await this.put(UnprocessedItems?.[this.table])
   }
 
-  protected clone(): this {
+  protected clone(schema = this.schema, debug = this._debug): this {
     return new BatchPutChain(
-      this.schema,
+      schema,
       this.client,
       this.table,
-      this.items
+      this.items,
+      debug
     ) as any
   }
 }

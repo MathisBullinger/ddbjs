@@ -13,7 +13,7 @@ export default abstract class BaseChain<
   constructor(
     readonly fields: F,
     protected readonly client: AWS.DynamoDB.DocumentClient,
-    private _debug = false
+    protected _debug = false
   ) {
     let _resolve: any
     let _reject: any
@@ -39,9 +39,7 @@ export default abstract class BaseChain<
   protected abstract execute(): Promise<void>
 
   public debug(): this {
-    const newInst = this.clone()
-    newInst._debug = true
-    return newInst
+    return this.clone(this.fields, true)
   }
 
   protected log(method: string, params?: Record<string, any>) {
@@ -101,8 +99,8 @@ export default abstract class BaseChain<
     for (const [path, type] of Object.entries(casts))
       apply(type, path.split('.'))
 
-    return this.clone(fields)
+    return this.clone(fields, this._debug)
   }
 
-  protected abstract clone(fields?: F): this
+  protected abstract clone(fields?: F, debug?: boolean): this
 }

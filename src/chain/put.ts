@@ -17,9 +17,10 @@ export class PutChain<
     private readonly keyFields: string[],
     private readonly params: AWS.DynamoDB.DocumentClient.PutItemInput,
     private readonly returnType: ReturnType = 'NONE',
-    private readonly existCheck = false
+    private readonly existCheck = false,
+    debug?: boolean
   ) {
-    super(fields, client)
+    super(fields, client, debug)
   }
 
   async execute() {
@@ -60,29 +61,29 @@ export class PutChain<
 
   returning<R extends ReturnType>(v: R): PutChain<T, R> {
     assert(oneOf(v, 'NEW', 'OLD', 'NONE'), new ReturnValueError(v, 'insert'))
-    return new PutChain(
-      this.fields,
-      this.client,
-      this.keyFields,
-      this.params,
-      v
-    )
+    return this.clone(this.fields, this._debug, v)
   }
 
   public ifNotExists(): PutChain<T, R> {
-    return this.clone(this.fields, true)
+    return this.clone(this.fields, this._debug, this.returnType, true)
   }
 
   public cast = super._cast.bind(this)
 
-  protected clone(fields = this.fields, existsCheck?: boolean) {
+  protected clone(
+    fields = this.fields,
+    debug = this._debug,
+    returnType = this.returnType,
+    existsCheck?: boolean
+  ) {
     return new PutChain(
       fields,
       this.client,
       this.keyFields,
       this.params,
-      this.returnType,
-      existsCheck
+      returnType,
+      existsCheck,
+      debug
     ) as any
   }
 }

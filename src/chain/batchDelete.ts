@@ -10,9 +10,10 @@ export class BatchDeleteChain<T extends Fields> extends BaseChain<
     schema: T,
     client: AWS.DynamoDB.DocumentClient,
     private readonly table: string,
-    private readonly keys: any[]
+    private readonly keys: any[],
+    debug?: boolean
   ) {
-    super(schema, client)
+    super(schema, client, debug)
   }
 
   async execute() {
@@ -32,12 +33,13 @@ export class BatchDeleteChain<T extends Fields> extends BaseChain<
       .promise()
   }
 
-  protected clone(fields = this.fields) {
+  protected clone(fields = this.fields, debug = this._debug) {
     return new BatchDeleteChain(
       fields,
       this.client,
       this.table,
-      this.keys
+      this.keys,
+      debug
     ) as any
   }
 }

@@ -26,9 +26,10 @@ export class UpdateChain<
     fields: F,
     client: AWS.DynamoDB.DocumentClient,
     private readonly update: UpdateInput<T, F> & UpdateOpts,
-    private readonly returnType: ReturnType = 'NONE'
+    private readonly returnType: ReturnType = 'NONE',
+    debug?: boolean
   ) {
-    super(fields, client)
+    super(fields, client, debug)
   }
 
   async execute() {
@@ -85,7 +86,7 @@ export class UpdateChain<
   remove(...fields: string[]): UpdateChain<T, RT, F, RV> {
     const update = this.update
     update.remove = [...(update.remove ?? []), ...fields]
-    return this.clone(this.fields, update)
+    return this.clone(this.fields, this._debug, update)
   }
 
   add(
@@ -93,7 +94,7 @@ export class UpdateChain<
   ): UpdateChain<T, RT, F, RV> {
     const update = this.update
     update.add = { ...update.add, ...fields }
-    return this.clone(this.fields, update)
+    return this.clone(this.fields, this._debug, update)
   }
 
   delete(
@@ -101,20 +102,18 @@ export class UpdateChain<
   ): UpdateChain<T, RT, F, RV> {
     const update = this.update
     update.delete = { ...update.delete, ...fields }
-    return this.clone(this.fields, update)
+    return this.clone(this.fields, this._debug, update)
   }
 
   returning<R extends ReturnType>(v: R): UpdateChain<T, R, F> {
-    return new UpdateChain(this.fields, this.client, this.update, v)
+    return this.clone(this.fields, this._debug, this.update, v)
   }
 
   ifExists(): UpdateChain<T, RT, F, RV> {
-    return new UpdateChain(
-      this.fields,
-      this.client,
-      { ...this.update, ifExists: true },
-      this.returnType
-    )
+    return this.clone(this.fields, this._debug, {
+      ...this.update,
+      ifExists: true,
+    })
   }
 
   private isComplete(
@@ -127,7 +126,18 @@ export class UpdateChain<
 
   public cast = super._cast.bind(this)
 
-  protected clone(fields = this.fields, update = this.update) {
-    return new UpdateChain(fields, this.client, update, this.returnType) as any
+  protected clone(
+    fields = this.fields,
+    debug = this._debug,
+    update = this.update,
+    returnType = this.returnType
+  ) {
+    return new UpdateChain(
+      fields,
+      this.client,
+      update,
+      returnType,
+      debug
+    ) as any
   }
 }
