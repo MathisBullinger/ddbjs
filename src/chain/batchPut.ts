@@ -1,16 +1,16 @@
 import BaseChain from './base'
 import { batch } from '../utils/array'
-import type { Schema, Fields, Item } from '../types'
+import type { Schema, Fields, Item, KeySym } from '../types'
 
 export class BatchPutChain<
   T extends Schema<F>,
-  F extends Fields = Omit<T, 'key'>
+  F extends Fields = Omit<T, KeySym>
 > extends BaseChain<undefined, T> {
   constructor(
     private readonly schema: T,
     client: AWS.DynamoDB.DocumentClient,
     private readonly table: string,
-    private readonly items: Item<F, T['key']>[],
+    private readonly items: Item<F, T[KeySym]>[],
     debug?: boolean
   ) {
     super(schema, client, debug)

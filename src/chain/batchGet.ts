@@ -2,11 +2,11 @@ import BaseChain from './base'
 import { decode } from '../utils/convert'
 import * as expr from '../expression'
 import { batch } from '../utils/array'
-import type { Schema, Fields, DBItem } from '../types'
+import type { Schema, Fields, DBItem, KeySym } from '../types'
 
 export class BatchGetChain<
   T extends Schema<F>,
-  F extends Fields = Omit<T, 'key'>
+  F extends Fields = Omit<T, KeySym>
 > extends BaseChain<DBItem<F>[], F> {
   constructor(
     private readonly schema: T,
@@ -70,7 +70,7 @@ export class BatchGetChain<
   }
 
   public sort() {
-    const keyFields = [this.schema.key].flat() as string[]
+    const keyFields = [this.schema[BaseChain.key!]].flat() as string[]
     return this.clone(
       this.schema,
       this._debug,

@@ -1,7 +1,7 @@
 import BaseChain from './base'
 import * as build from '../expression'
 import { decode } from '../utils/convert'
-import type { Fields, Schema, DBItem, UpdateInput } from '../types'
+import type { Fields, Schema, DBItem, UpdateInput, KeySym } from '../types'
 import { mapValues } from '../utils/object'
 
 type ReturnType = 'NONE' | 'OLD' | 'NEW' | 'UPDATED_OLD' | 'UPDATED_NEW'
@@ -15,7 +15,7 @@ type UpdateOpts = {
 export class UpdateChain<
   T extends Schema<F>,
   RT extends ReturnType,
-  F extends Fields = Omit<T, 'key'>,
+  F extends Fields = Omit<T, KeySym>,
   RV = RT extends 'NONE'
     ? undefined
     : RT extends 'OLD' | 'NEW'

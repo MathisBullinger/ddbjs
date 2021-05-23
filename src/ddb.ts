@@ -8,6 +8,7 @@ import {
   BatchPutChain,
   BatchDeleteChain,
   ScanChain,
+  BaseChain,
 } from './chain'
 import type {
   Schema,
@@ -19,14 +20,20 @@ import type {
   DBItem,
 } from './types'
 
-export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
+export const DDBKey = Symbol('key')
+BaseChain.key = DDBKey
+
+export class DDB<
+  T extends Schema<F>,
+  F extends Fields = Omit<T, typeof DDBKey>
+> {
   public readonly client: AWS.DynamoDB.DocumentClient
   private readonly fields: F
 
   /**
    * @example
    * new DDB('users', {
-   *   key: 'id', id: String, name: String, tags: [Number]
+   *   [DDBKey]: 'id', id: String, name: String, tags: [Number]
    * })
    *
    * @param table table name
@@ -65,7 +72,9 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     )
   }
 
-  public put<I extends Item<F, T['key']>>(item: I): PutChain<F, 'NONE'> {
+  public put<I extends Item<F, T[typeof DDBKey]>>(
+    item: I
+  ): PutChain<F, 'NONE'> {
     const params: AWS.DynamoDB.DocumentClient.PutItemInput = {
       TableName: this.table,
       Item: item,
@@ -73,7 +82,7 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
     return new PutChain(this.fields, this.client, this.keyFields, params)
   }
 
-  public batchPut(...items: Item<F, T['key']>[]): BatchPutChain<T, F> {
+  public batchPut(...items: Item<F, T[typeof DDBKey]>[]): BatchPutChain<T, F> {
     return new BatchPutChain(this.schema, this.client, this.table, items)
   }
 
@@ -129,9 +138,9 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
   }
 
   private get keyFields(): string[] {
-    return typeof this.schema.key === 'string'
-      ? [this.schema.key]
-      : (this.schema.key as string[])
+    return typeof this.schema[DDBKey] === 'string'
+      ? [this.schema[DDBKey] as string]
+      : (this.schema[DDBKey] as string[])
   }
 
   private key(...v: KeyValue<T, F>) {
@@ -145,5 +154,5 @@ export class DDB<T extends Schema<F>, F extends Fields = Omit<T, 'key'>> {
 }
 
 export type DBRecord<T extends DDB<any, any>> = T extends DDB<infer S, infer F>
-  ? Item<F, S['key']>
+  ? Item<F, S[typeof DDBKey]>
   : never

@@ -1,4 +1,4 @@
-import { db, ranId, scanDB } from './utils/db'
+import { db, ranId, scanDB, scanDBComp } from './utils/db'
 import type { DBRecord } from '../src/ddb'
 
 jest.setTimeout(20000)
@@ -507,6 +507,17 @@ test('scan & truncate', async () => {
   await expect(count(scanDB)).resolves.toBeGreaterThan(0)
   await expect(scanDB.truncate()).resolves.not.toThrow()
   await expect(count(scanDB)).resolves.toBe(0)
+
+  await scanDBComp.batchPut(
+    ...[...Array(5000)].map(() => ({
+      pk: Math.random().toString(),
+      sk: Math.random().toString(),
+      [`a${Math.random()}`]: Math.random(),
+    }))
+  )
+  await expect(count(scanDBComp)).resolves.toBeGreaterThan(0)
+  await expect(scanDBComp.truncate()).resolves.not.toThrow()
+  await expect(count(scanDBComp)).resolves.toBe(0)
 })
 
 // misc

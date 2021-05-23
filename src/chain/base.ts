@@ -1,5 +1,5 @@
 import { clone } from '../utils/object'
-import type { Fields, ExplTypes } from '../types'
+import type { Fields, ExplTypes, KeySym } from '../types'
 
 export default abstract class BaseChain<
   T,
@@ -8,6 +8,8 @@ export default abstract class BaseChain<
   static get [Symbol.species]() {
     return Promise
   }
+
+  static key?: KeySym
 
   // @ts-ignore
   constructor(

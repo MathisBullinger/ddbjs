@@ -1,6 +1,6 @@
 import BaseChain from './base'
 import { batch } from '../utils/array'
-import type { Fields, DBItem } from '../types'
+import type { Fields } from '../types'
 
 export class BatchDeleteChain<T extends Fields> extends BaseChain<
   undefined,

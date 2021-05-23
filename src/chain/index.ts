@@ -1,3 +1,4 @@
+export { default as BaseChain } from './base'
 export * from './get'
 export * from './batchGet'
 export * from './put'

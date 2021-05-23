@@ -1,4 +1,4 @@
-import { DDB } from '../../src'
+import { DDB, DDBKey } from '../../src'
 import * as localDynamo from 'local-dynamo'
 import * as AWS from 'aws-sdk'
 
@@ -22,7 +22,7 @@ export const ddb = new AWS.DynamoDB(opts)
 export const db = new DDB(
   TableName,
   {
-    key: 'id',
+    [DDBKey]: 'id',
     id: String,
     data: String,
     num: Number,
@@ -43,17 +43,32 @@ export const db = new DDB(
 
 export const scanDB = new DDB(
   `scan-${TableName}`,
-  { key: 'id', id: Number },
+  { [DDBKey]: 'id', id: Number },
+  opts
+)
+
+export const scanDBComp = new DDB(
+  `scan-${TableName}-comp`,
+  { [DDBKey]: ['pk', 'sk'], pk: String, sk: String },
   opts
 )
 
 let child: ReturnType<typeof localDynamo.launch>
 
-async function createTable(TableName: string, key = 'id', type = 'S') {
+async function createTable(
+  TableName: string,
+  ...keys: [name: string, type: string, role: string][]
+) {
   await ddb
     .createTable({
-      AttributeDefinitions: [{ AttributeName: key, AttributeType: type }],
-      KeySchema: [{ AttributeName: key, KeyType: 'HASH' }],
+      AttributeDefinitions: keys.map(([name, type]) => ({
+        AttributeName: name,
+        AttributeType: type,
+      })),
+      KeySchema: keys.map(([name, , type]) => ({
+        AttributeName: name,
+        KeyType: type,
+      })),
       ProvisionedThroughput: {
         ReadCapacityUnits: 1,
         WriteCapacityUnits: 1,
@@ -66,8 +81,9 @@ async function createTable(TableName: string, key = 'id', type = 'S') {
 beforeAll(async () => {
   child = localDynamo.launch(undefined, 4567)
   await Promise.all([
-    createTable(db.table),
-    createTable(scanDB.table, 'id', 'N'),
+    createTable(db.table, ['id', 'S', 'HASH']),
+    createTable(scanDB.table, ['id', 'N', 'HASH']),
+    createTable(scanDBComp.table, ['pk', 'S', 'HASH'], ['sk', 'S', 'RANGE']),
   ])
   await db.client
     .put({ TableName, Item: { id: 'bar', data: 'something' } })
@@ -77,5 +93,6 @@ beforeAll(async () => {
 afterAll(async () => {
   await ddb.deleteTable({ TableName }).promise()
   await ddb.deleteTable({ TableName: scanDB.table }).promise()
+  await ddb.deleteTable({ TableName: scanDBComp.table }).promise()
   child?.kill()
 })

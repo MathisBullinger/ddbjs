@@ -1,4 +1,7 @@
-export type Schema<T extends Fields> = T & Readonly<{ key: Key<T> }>
+import { DDBKey } from './ddb'
+export type KeySym = typeof DDBKey
+
+export type Schema<T extends Fields> = T & Readonly<{ [DDBKey]: Key<T> }>
 
 export type Fields = Readonly<Record<string, SchemaValueType>>
 
@@ -40,17 +43,19 @@ export type SchemaValue<
 
 export type KeyValue<
   T extends Schema<F>,
-  F extends Fields = Omit<T, 'key'>
-> = T['key'] extends CompositeKey<F>
-  ? [SchemaValue<F[T['key'][0]]>, SchemaValue<F[T['key'][1]]>]
-  : T['key'] extends keyof F
-  ? [SchemaValue<F[T['key']]>]
+  F extends Fields = Omit<T, typeof DDBKey>
+> = T[typeof DDBKey] extends CompositeKey<F>
+  ? [SchemaValue<F[T[typeof DDBKey][0]]>, SchemaValue<F[T[typeof DDBKey][1]]>]
+  : T[typeof DDBKey] extends keyof F
+  ? [SchemaValue<F[T[typeof DDBKey]]>]
   : never
 
 export type FlatKeyValue<
   T extends Schema<F>,
-  F extends Fields = Omit<T, 'key'>
-> = T['key'] extends CompositeKey<F> ? KeyValue<T, F> : KeyValue<T, F>[0]
+  F extends Fields = Omit<T, typeof DDBKey>
+> = T[typeof DDBKey] extends CompositeKey<F>
+  ? KeyValue<T, F>
+  : KeyValue<T, F>[0]
 
 export type KeyFields<T extends Fields, K extends Key<T>> = keyof Pick<
   T,
@@ -71,8 +76,8 @@ export type DBItem<T extends Fields> = { [K in keyof T]: SchemaValue<T[K]> } &
 
 export type UpdateInput<
   T extends Schema<F>,
-  F extends Fields = Omit<T, 'key'>,
-  TI = Omit<Item<F, T['key']>, KeyFields<F, T['key']>>
+  F extends Fields = Omit<T, typeof DDBKey>,
+  TI = Omit<Item<F, T[typeof DDBKey]>, KeyFields<F, T[typeof DDBKey]>>
 > = {
   set?: Record<string, any> & TI
   remove?: string[]
@@ -82,7 +87,7 @@ export type UpdateInput<
 
 export type ItemUpdate<
   T extends Schema<F>,
-  F extends Fields = Omit<T, 'key'>,
+  F extends Fields = Omit<T, typeof DDBKey>,
   U extends UpdateInput<T, F> = UpdateInput<T, F>
 > = NonNullable<U['set']> & {
   $remove?: U['remove']
