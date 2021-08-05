@@ -547,6 +547,38 @@ test('conditions', async () => {
 
     await expect(db.get(id)).resolves.toMatchObject({ num: 4 })
   }
+
+  {
+    const id = ranId()
+    await db.put({ id, num: 5 })
+
+    await expect(db.update(id, { num: 6 }).if('num', '=', 7)).rejects.toThrow()
+    await expect(
+      db.update(id, { num: 6 }).if('num', '=', 7).orIf('num', '=', 5)
+    ).resolves.not.toThrow()
+  }
+
+  {
+    const id = ranId()
+    await db.put({ id, data: 'foo', num: 1 })
+
+    // (false and true) or true
+    await expect(
+      db
+        .update(id, { data: 'baz' })
+        .if('data', '=', 'bar')
+        .andIf('num', '>', 0)
+        .orIf('num', '<=', 1)
+    ).resolves.not.toThrow()
+
+    // false and (true or true)
+    await expect(
+      db
+        .update(id, { data: 'baz' })
+        .if('data', '=', 'bar')
+        .andIf(v => v.if('num', '>', 0).orIf('num', '<=', 1))
+    ).rejects.toThrow()
+  }
 })
 
 // misc

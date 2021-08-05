@@ -9,7 +9,6 @@ type ReturnType = 'NONE' | 'OLD' | 'NEW' | 'UPDATED_OLD' | 'UPDATED_NEW'
 
 type UpdateOpts = {
   table: string
-  ifExists?: boolean
   key: any
 }
 
@@ -38,7 +37,6 @@ export class UpdateChain<
       TableName: this.update.table,
       Key: this.update.key,
     }
-    const conditions: string[] = []
 
     this.update.set = this.makeSets(this.update.set)
 
@@ -63,16 +61,6 @@ export class UpdateChain<
     params.ReturnValues = ['NEW', 'OLD'].includes(this.returnType)
       ? `ALL_${this.returnType}`
       : this.returnType
-
-    if (this.update.ifExists) {
-      for (const [k, v] of Object.entries(params.Key!)) {
-        const name = `:${k}`
-        ;(params.ExpressionAttributeValues ??= {})[name] = v
-        conditions.push(`${k}=${name}`)
-      }
-    }
-
-    if (conditions.length) params.ConditionExpression = conditions.join(' AND ')
 
     Object.assign(params, expr.merge(params as any, this.buildCondition()))
 
@@ -112,11 +100,11 @@ export class UpdateChain<
     return this.clone(this.fields, this._debug, this.update, v)
   }
 
-  ifExists(): UpdateChain<T, RT, F, RV> {
-    return this.clone(this.fields, this._debug, {
-      ...this.update,
-      ifExists: true,
-    })
+  ifExists() {
+    let chain = this
+    for (const [k, v] of Object.entries(this.update.key))
+      chain = chain.if(k as any, '=', v)
+    return chain
   }
 
   private isComplete(
@@ -142,7 +130,7 @@ export class UpdateChain<
       returnType,
       debug
     ) as any
-    chain.conditions = [...this.conditions]
+    chain.condition = this.cloneConditon()
     return chain
   }
 }
