@@ -30,9 +30,8 @@ export class PutChain<
       const conditions: string[] = []
       for (const k of this.keyFields) {
         const name = `:${k}`
-        ;(this.params.ExpressionAttributeValues ??= {})[
-          name
-        ] = this.params.Item[k]
+        ;(this.params.ExpressionAttributeValues ??= {})[name] =
+          this.params.Item[k]
         conditions.push(`${k}<>${name}`)
       }
       this.params.ConditionExpression = conditions.join(' AND ')

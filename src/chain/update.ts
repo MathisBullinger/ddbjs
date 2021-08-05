@@ -1,5 +1,6 @@
 import BaseChain from './base'
-import * as build from '../expression'
+import ConditionChain from './condition'
+import * as expr from '../expression'
 import { decode } from '../utils/convert'
 import type { Fields, Schema, DBItem, UpdateInput, KeySym } from '../types'
 import { mapValues } from '../utils/object'
@@ -21,7 +22,7 @@ export class UpdateChain<
     : RT extends 'OLD' | 'NEW'
     ? DBItem<F>
     : Partial<DBItem<F>>
-> extends BaseChain<RV, F> {
+> extends ConditionChain<RV, F> {
   constructor(
     fields: F,
     client: AWS.DynamoDB.DocumentClient,
@@ -43,16 +44,16 @@ export class UpdateChain<
 
     Object.assign(
       params,
-      build.merge(
-        build.set(this.update.set),
-        build.remove(...(this.update.remove ?? [])),
-        build.add(
+      expr.merge(
+        expr.set(this.update.set),
+        expr.remove(...(this.update.remove ?? [])),
+        expr.add(
           this.update.add &&
             mapValues(this.update.add, v =>
               Array.isArray(v) ? this.client.createSet(v) : v
             )
         ),
-        build.del(
+        expr.del(
           this.update.delete &&
             mapValues(this.update.delete, v => this.client.createSet(v))
         )
@@ -72,6 +73,8 @@ export class UpdateChain<
     }
 
     if (conditions.length) params.ConditionExpression = conditions.join(' AND ')
+
+    Object.assign(params, expr.merge(params as any, this.buildCondition()))
 
     if (!this.isComplete(params)) throw Error('incomplete update')
 
@@ -132,12 +135,14 @@ export class UpdateChain<
     update = this.update,
     returnType = this.returnType
   ) {
-    return new UpdateChain(
+    const chain = new UpdateChain(
       fields,
       this.client,
       update,
       returnType,
       debug
     ) as any
+    chain.conditions = [...this.conditions]
+    return chain
   }
 }

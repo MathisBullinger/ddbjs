@@ -520,6 +520,35 @@ test('scan & truncate', async () => {
   await expect(count(scanDBComp)).resolves.toBe(0)
 })
 
+// condition expressions
+
+test('conditions', async () => {
+  {
+    const id = ranId()
+    await db.put({ id, bool: true, num: 0 })
+
+    await expect(
+      db.update(id, { num: 1 }).if('bool', '=', false).debug()
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { num: 2 }).if('bool', '=', false)
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { num: 3 }).if('bool', '<>', true)
+    ).rejects.toThrow()
+
+    await expect(db.get(id)).resolves.toMatchObject({ num: 0 })
+
+    await expect(
+      db.update(id, { num: 4 }).if('bool', '=', true)
+    ).resolves.toBeUndefined()
+
+    await expect(db.get(id)).resolves.toMatchObject({ num: 4 })
+  }
+})
+
 // misc
 
 test('is typescript promise', async () => {
