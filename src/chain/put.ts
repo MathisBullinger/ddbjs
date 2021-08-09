@@ -1,4 +1,3 @@
-// import BaseChain from './base'
 import ConditionChain from './condition'
 import { decode } from '../utils/convert'
 import { assert, ReturnValueError } from '../utils/error'
@@ -57,7 +56,7 @@ export class PutChain<
   public ifNotExists() {
     let chain = this
     for (const k of this.keyFields)
-      chain = chain.if(k, '<>', this.params.Item[k])
+      chain = chain.if(k, '<>', this.params.Item[k]) as any
     return chain
   }
 

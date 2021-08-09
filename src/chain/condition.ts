@@ -2,6 +2,8 @@ import BaseChain from './base'
 import type { Fields } from '../types'
 import * as expr from '../expression'
 import * as naming from '../utils/naming'
+import partial from 'snatchblock/partial'
+import type { λ } from 'snatchblock/types'
 
 type Comparator = '=' | '<>' | '<' | '<=' | '>' | '>='
 
@@ -12,28 +14,67 @@ type CompArgs<T, U> =
 const isCB = <T, U>(args: CompArgs<T, U>): args is [(c: U) => U] =>
   typeof args[0] === 'function'
 
+type AddCond<T, F extends Fields> = ((
+  ...args: CompArgs<F, ConditionChain<T, F>>
+) => ConditionChain<T, F>) & { not: AddCond<T, F> }
+
 export default abstract class ConditionChain<
   T,
   F extends Fields
 > extends BaseChain<T, F> {
-  private ifAndOr =
-    (con: 'AND' | 'OR') =>
-    (...args: CompArgs<F, ConditionChain<T, F>>): this => {
+  private ifAndOr = (
+    con: 'AND' | 'OR',
+    wrap: ConditionWrapper
+  ): AddCond<T, F> => {
+    const fun = (...args: CompArgs<F, ConditionChain<T, F>>) => {
       if (!isCB(args)) {
-        this.addCondition(new Comparison(...args), con)
+        this.addCondition(wrap(new Comparison(...args)), con)
         return this
       } else {
         const cond = this.cloneConditon()
         delete this.condition
         const chain = args[0](this)
+        chain.condition = wrap(chain.condition!)
         chain.addCondition(cond, con, true)
         return chain as this
       }
     }
 
-  public if = this.ifAndOr('AND')
-  public andIf = this.ifAndOr('AND')
-  public orIf = this.ifAndOr('OR')
+    Reflect.defineProperty(fun, 'not', {
+      get: () => this.makeNegated(this.condMeths.get(fun)!),
+    })
+    return fun as any
+  }
+
+  private makeNegated(
+    f: (wrap: ConditionWrapper) => λ,
+    wrap: ConditionWrapper = v => v
+  ) {
+    const negate = (v: any) => wrap(new Negated(v, this.serialize.bind(this)))
+    const negated = (...args: CompArgs<F, ConditionChain<T, F>>) => {
+      return this.conditionFactory(f)(negate)(...args)
+    }
+    Reflect.defineProperty(negated, 'not', {
+      get: () => this.makeNegated(f, negate),
+    })
+    return negated
+  }
+
+  private condMeths = new Map<
+    (...args: any[]) => any,
+    (wrap: ConditionWrapper) => λ
+  >()
+  private conditionFactory =
+    <T extends λ<[ConditionWrapper], λ>>(handler: T) =>
+    (wrapper?: ConditionWrapper): ReturnType<T> => {
+      const wrapped = handler(wrapper ?? (v => v))
+      this.condMeths.set(wrapped, handler)
+      return wrapped as any
+    }
+
+  public if = this.conditionFactory(partial(this.ifAndOr, 'AND'))()
+  public andIf = this.conditionFactory(partial(this.ifAndOr, 'AND'))()
+  public orIf = this.conditionFactory(partial(this.ifAndOr, 'OR'))()
 
   private addCondition(
     cond: ConditionList | undefined,
@@ -97,6 +138,7 @@ export default abstract class ConditionChain<
 }
 
 type ConditionList = Condition | [ConditionList, 'AND' | 'OR', ConditionList]
+type ConditionWrapper = (condition: ConditionList) => ConditionList
 
 abstract class Condition {
   abstract expr(
@@ -107,14 +149,31 @@ abstract class Condition {
 
 class Comparison extends Condition {
   constructor(
-    public readonly a: string,
-    public readonly comp: Comparator,
-    public readonly b: unknown
+    private readonly a: string,
+    private readonly comp: Comparator,
+    private readonly b: unknown
   ) {
     super()
   }
 
   expr(name: (key: string) => string, value: (value: unknown) => string) {
     return `${name(this.a)} ${this.comp} ${value(this.b)}`
+  }
+}
+
+class Negated extends Condition {
+  constructor(
+    private readonly condition: ConditionList,
+    private readonly serialize: (
+      condition: ConditionList,
+      name: (key: string) => string,
+      value: (value: unknown) => string
+    ) => string
+  ) {
+    super()
+  }
+
+  expr(name: (key: string) => string, value: (value: unknown) => string) {
+    return `NOT (${this.serialize(this.condition, name, value)})`
   }
 }

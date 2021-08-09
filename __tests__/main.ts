@@ -579,6 +579,40 @@ test('conditions', async () => {
         .andIf(v => v.if('num', '>', 0).orIf('num', '<=', 1))
     ).rejects.toThrow()
   }
+
+  {
+    const id = ranId()
+    await db.put({ id, data: 'foo' })
+
+    await expect(
+      db.update(id, { bool: true }).if.not('data', '=', 'foo')
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { bool: true }).if.not.not('data', '=', 'foo')
+    ).resolves.not.toThrow()
+
+    await expect(
+      db.update(id, { bool: true }).if.not.not.not('data', '=', 'foo')
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { bool: true }).if.not.not.not.not('data', '=', 'foo')
+    ).resolves.not.toThrow()
+
+    await expect(
+      db
+        .update(id, { bool: true })
+        .if.not(v => v.if('data', '=', 'bar').orIf('data', '=', 'baz'))
+    ).resolves.not.toThrow()
+
+    await expect(
+      db
+        .update(id, { bool: true })
+        .if.not('data', '=', 'foo')
+        .orIf.not('data', '<>', 'foo')
+    ).resolves.not.toThrow()
+  }
 })
 
 // misc

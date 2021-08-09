@@ -103,7 +103,7 @@ export class UpdateChain<
   ifExists() {
     let chain = this
     for (const [k, v] of Object.entries(this.update.key))
-      chain = chain.if(k as any, '=', v)
+      chain = chain.if(k as any, '=', v) as any
     return chain
   }
 
