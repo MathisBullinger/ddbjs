@@ -8,7 +8,11 @@ import type { λ } from 'snatchblock/types'
 type Comparator = '=' | '<>' | '<' | '<=' | '>' | '>='
 
 type CompArgs<T, U> =
-  | [field: keyof T & string, comparator: Comparator, value: any]
+  | [
+      field: (keyof T & string) | { size: keyof T & string },
+      comparator: Comparator,
+      value: any
+    ]
   | [cb: (chain: U) => U]
 
 const isCB = <T, U>(args: CompArgs<T, U>): args is [(c: U) => U] =>
@@ -35,7 +39,9 @@ export default abstract class ConditionChain<
   ): AddCond<T, F> => {
     const fun = (...args: CompArgs<F, ConditionChain<T, F>>) => {
       if (!isCB(args)) {
-        this.addCondition(wrap(new Comparison(...args)), con)
+        const [p, ...rest] = args
+        const field = typeof p === 'object' ? new Function('size', p.size) : p
+        this.addCondition(wrap(new Comparison(field, ...rest)), con)
         return this
       } else {
         const cond = this.cloneConditon()
@@ -180,7 +186,7 @@ abstract class Condition {
 
 class Comparison extends Condition {
   constructor(
-    private readonly a: string,
+    private readonly a: string | Condition,
     private readonly comp: Comparator,
     private readonly b: unknown
   ) {
@@ -188,7 +194,8 @@ class Comparison extends Condition {
   }
 
   expr(name: (key: string) => string, value: (value: unknown) => string) {
-    return `${name(this.a)} ${this.comp} ${value(this.b)}`
+    const a = this.a instanceof Condition ? this.a.expr(name, value) : this.a
+    return `${name(a)} ${this.comp} ${value(this.b)}`
   }
 }
 

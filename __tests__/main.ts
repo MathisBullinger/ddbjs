@@ -705,6 +705,13 @@ test('conditions', async () => {
     await expect(
       db.update(id, { num: 2 }).if.contains('strset', 'd')
     ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { num: 2 }).if({ size: 'data' }, '>=', 3)
+    ).resolves.not.toThrow()
+    await expect(
+      db.update(id, { num: 2 }).if({ size: 'num' }, '>', 5)
+    ).rejects.toThrow()
   }
 })
 
