@@ -1,5 +1,5 @@
 import BaseChain from './base'
-import type { Fields } from '../types'
+import type { Fields, AttributeType } from '../types'
 import * as expr from '../expression'
 import * as naming from '../utils/naming'
 import partial from 'snatchblock/partial'
@@ -16,7 +16,14 @@ const isCB = <T, U>(args: CompArgs<T, U>): args is [(c: U) => U] =>
 
 type AddCond<T, F extends Fields> = ((
   ...args: CompArgs<F, ConditionChain<T, F>>
-) => ConditionChain<T, F>) & { not: AddCond<T, F> }
+) => ConditionChain<T, F>) & { not: AddCond<T, F> } & MapReturn<
+    ConditionChain<T, F>['functions_'],
+    ConditionChain<T, F>
+  >
+
+type MapReturn<T extends Record<string, λ>, R> = {
+  [K in keyof T]: λ<Parameters<T[K]>, R>
+}
 
 export default abstract class ConditionChain<
   T,
@@ -43,21 +50,13 @@ export default abstract class ConditionChain<
     Reflect.defineProperty(fun, 'not', {
       get: () => this.makeNegated(this.condMeths.get(fun)!),
     })
-    return fun as any
-  }
-
-  private makeNegated(
-    f: (wrap: ConditionWrapper) => λ,
-    wrap: ConditionWrapper = v => v
-  ) {
-    const negate = (v: any) => wrap(new Negated(v, this.serialize.bind(this)))
-    const negated = (...args: CompArgs<F, ConditionChain<T, F>>) => {
-      return this.conditionFactory(f)(negate)(...args)
-    }
-    Reflect.defineProperty(negated, 'not', {
-      get: () => this.makeNegated(f, negate),
+    this.functions.forEach((f: any, k) => {
+      ;(fun as any)[k] = (...args: any[]) => {
+        this.addCondition(f(...args), con)
+        return this
+      }
     })
-    return negated
+    return fun as any
   }
 
   private condMeths = new Map<
@@ -71,6 +70,20 @@ export default abstract class ConditionChain<
       this.condMeths.set(wrapped, handler)
       return wrapped as any
     }
+
+  private functions_ = {
+    attributeExists: (path: keyof F) =>
+      new Function('attribute_exists', path as string),
+    attributeNotExists: (path: keyof F) =>
+      new Function('attribute_not_exists', path as string),
+    attributeType: (path: keyof F, type: AttributeType) =>
+      new Function('attribute_type', path as string, type),
+    beginsWith: (path: keyof F, substr: string) =>
+      new Function('begins_with', path as string, substr),
+    contains: (path: keyof F, operand: unknown) =>
+      new Function('contains', path as string, operand),
+  }
+  private functions = new Map(Object.entries(this.functions_))
 
   public if = this.conditionFactory(partial(this.ifAndOr, 'AND'))()
   public andIf = this.conditionFactory(partial(this.ifAndOr, 'AND'))()
@@ -135,6 +148,24 @@ export default abstract class ConditionChain<
     if (node instanceof Condition) return node
     return [this.cloneConditon(node[0])!, node[1], this.cloneConditon(node[2])!]
   }
+
+  private makeNegated(
+    f: (wrap: ConditionWrapper) => λ,
+    wrap: ConditionWrapper = v => v
+  ) {
+    const negate = (v: any) => wrap(new Negated(v, this.serialize.bind(this)))
+    const negated = (...args: CompArgs<F, ConditionChain<T, F>>) => {
+      return this.conditionFactory(f)(negate)(...args)
+    }
+    Reflect.defineProperty(negated, 'not', {
+      get: () => this.makeNegated(f, negate),
+    })
+    this.functions.forEach((_, k) => {
+      ;(negated as any)[k] = (...args: any[]) =>
+        negated((v: any) => v.if[k](...args))
+    })
+    return negated
+  }
 }
 
 type ConditionList = Condition | [ConditionList, 'AND' | 'OR', ConditionList]
@@ -175,5 +206,23 @@ class Negated extends Condition {
 
   expr(name: (key: string) => string, value: (value: unknown) => string) {
     return `NOT (${this.serialize(this.condition, name, value)})`
+  }
+}
+
+class Function extends Condition {
+  static none = Symbol('none')
+
+  constructor(
+    private readonly name: string,
+    private readonly path: string,
+    private readonly arg: unknown = Function.none
+  ) {
+    super()
+  }
+
+  expr(name: (key: string) => string, value: (value: unknown) => string) {
+    const args = [name(this.path)]
+    if (this.arg !== Function.none) args.push(value(this.arg))
+    return `${this.name}(${args.join(',')})`
   }
 }

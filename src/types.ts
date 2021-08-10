@@ -29,17 +29,16 @@ export type CompositeKey<
   T extends Fields = PrimitiveFields<R>
 > = [hash: keyof T, sort: keyof T]
 
-export type SchemaValue<
-  T extends SchemaValueType
-> = T extends PrimitiveConstructor
-  ? PrimitiveConstructorType<T>
-  : T extends []
-  ? any[]
-  : T extends any[]
-  ? PrimitiveConstructorType<T[number]>[]
-  : T extends Fields
-  ? Item<T, never>
-  : never
+export type SchemaValue<T extends SchemaValueType> =
+  T extends PrimitiveConstructor
+    ? PrimitiveConstructorType<T>
+    : T extends []
+    ? any[]
+    : T extends any[]
+    ? PrimitiveConstructorType<T[number]>[]
+    : T extends Fields
+    ? Item<T, never>
+    : never
 
 export type KeyValue<
   T extends Schema<F>,
@@ -109,15 +108,26 @@ export type NotEmptyObj<T extends Record<string, any>> = keyof T extends never
   ? never
   : T
 
-export type PrimitiveConstructorType<
-  T extends PrimitiveConstructor
-> = T extends StringConstructor
-  ? string
-  : T extends NumberConstructor
-  ? number
-  : boolean
+export type PrimitiveConstructorType<T extends PrimitiveConstructor> =
+  T extends StringConstructor
+    ? string
+    : T extends NumberConstructor
+    ? number
+    : boolean
 
 export type ExplTypes<T extends Record<string, any>> = {
   [K in keyof T]?: 'Set' | 'List'
 } &
   Record<string, 'Set' | 'List'>
+
+export type AttributeType =
+  | 'S'
+  | 'SS'
+  | 'N'
+  | 'NS'
+  | 'B'
+  | 'BS'
+  | 'BOOL'
+  | 'NULL'
+  | 'L'
+  | 'M'
