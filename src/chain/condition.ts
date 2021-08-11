@@ -6,8 +6,10 @@ import partial from 'snatchblock/partial'
 import oneOf from 'snatchblock/oneOf'
 import type { λ } from 'snatchblock/types'
 
-type CompArgs<T extends Fields, U> =
+type CondArgs<T extends Fields, U> =
   | [a: Operand<T>, comparator: Comparator, b: Operand<T>]
+  | [Operand<T>, 'between', Operand<T>, Operand<T>]
+  | [Operand<T>, 'in', ...Operand<T>[]]
   | [cb: (chain: U) => U]
 
 type Comparator = '=' | '<>' | '<' | '<=' | '>' | '>='
@@ -22,11 +24,16 @@ type Operand<T extends Fields> =
 type Literal = string | number | boolean | null
 
 const isCB = <T extends Fields, U>(
-  args: CompArgs<T, U>
+  args: CondArgs<T, U>
 ): args is [(c: U) => U] => typeof args[0] === 'function'
 
+const isComp = <T extends Fields, U>(
+  args: CondArgs<T, U>
+): args is [a: Operand<T>, comparator: Comparator, b: Operand<T>] =>
+  args.length === 3
+
 type AddCond<T, F extends Fields> = ((
-  ...args: CompArgs<F, ConditionChain<T, F>>
+  ...args: CondArgs<F, ConditionChain<T, F>>
 ) => ConditionChain<T, F>) & { not: AddCond<T, F> } & MapReturn<
     ConditionChain<T, F>['functions_'],
     ConditionChain<T, F>
@@ -76,8 +83,41 @@ export default abstract class ConditionChain<
     con: 'AND' | 'OR',
     wrap: ConditionWrapper
   ): AddCond<T, F> => {
-    const fun = (...args: CompArgs<F, ConditionChain<T, F>>) => {
-      if (!isCB(args)) {
+    const fun = (...args: CondArgs<F, ConditionChain<T, F>>) => {
+      if (isCB(args)) {
+        const cond = this.cloneConditon()
+        delete this.condition
+        const chain = args[0](this)
+        chain.condition = wrap(chain.condition!)
+        chain.addCondition(cond, con, true)
+        return chain as this
+      }
+      if (args[1] === 'between') {
+        const [a, _, b, c] = args
+        this.addCondition(
+          wrap(
+            new Between(
+              ...([a, b, c].map(v => this.resolveOperand(v)) as [any, any, any])
+            )
+          ),
+          con
+        )
+        return this
+      }
+      if (args[1] === 'in') {
+        const [v, _, ...list] = args
+        this.addCondition(
+          wrap(
+            new In(
+              this.resolveOperand(v),
+              list.map(e => this.resolveOperand(e))
+            )
+          ),
+          con
+        )
+        return this
+      }
+      if (isComp(args)) {
         const [a, comp, b] = args
         this.addCondition(
           wrap(
@@ -86,14 +126,8 @@ export default abstract class ConditionChain<
           con
         )
         return this
-      } else {
-        const cond = this.cloneConditon()
-        delete this.condition
-        const chain = args[0](this)
-        chain.condition = wrap(chain.condition!)
-        chain.addCondition(cond, con, true)
-        return chain as this
       }
+      throw Error('unknown condition format')
     }
 
     Reflect.defineProperty(fun, 'not', {
@@ -195,7 +229,7 @@ export default abstract class ConditionChain<
     wrap: ConditionWrapper = v => v
   ) {
     const negate = (v: any) => wrap(new Negated(v, this.serialize.bind(this)))
-    const negated = (...args: CompArgs<F, ConditionChain<T, F>>) => {
+    const negated = (...args: CondArgs<F, ConditionChain<T, F>>) => {
       return this.conditionFactory(f)(negate)(...args)
     }
     Reflect.defineProperty(negated, 'not', {
@@ -230,6 +264,39 @@ class Comparison extends Condition {
       v instanceof Condition ? v.expr() : v
     )
     return `${a} ${this.comp} ${b}`
+  }
+}
+
+class Between extends Condition {
+  constructor(
+    private readonly op: Literal | Condition,
+    private readonly a: Literal | Condition,
+    private readonly b: Literal | Condition
+  ) {
+    super()
+  }
+
+  expr() {
+    const [v, a, b] = [this.op, this.a, this.b].map(v =>
+      v instanceof Condition ? v.expr() : v
+    )
+    return `${v} BETWEEN ${a} AND ${b}`
+  }
+}
+
+class In extends Condition {
+  constructor(
+    private readonly op: Literal | Condition,
+    private readonly list: (Literal | Condition)[]
+  ) {
+    super()
+  }
+
+  expr() {
+    const [v, ...list] = [this.op, ...this.list].map(v =>
+      v instanceof Condition ? v.expr() : v
+    )
+    return `${v} IN (${list.join(',')})`
   }
 }
 

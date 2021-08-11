@@ -734,6 +734,35 @@ test('conditions', async () => {
       db.update(id, { bool: true }).if(2, '=', { size: 'strset' })
     ).resolves.not.toThrow()
   }
+
+  {
+    const id = ranId()
+    await db.put({ id, num: 5, num2: 5 })
+
+    await expect(
+      db.update(id, { bool: true }).if('num', 'between', 10, 15)
+    ).rejects.toThrow()
+    await expect(
+      db.update(id, { bool: true }).if('num', 'between', 3, 7)
+    ).resolves.not.toThrow()
+
+    await expect(
+      db.update(id, { bool: true }).if(7, 'between', 'num', 10)
+    ).resolves.not.toThrow()
+    await expect(
+      db.update(id, { bool: true }).if(15, 'between', 'num', 10)
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { bool: true }).if('num', 'in', 4, 5, 6)
+    ).resolves.not.toThrow()
+    await expect(
+      db.update(id, { bool: true }).if('num', 'in', 6, 7, 'a')
+    ).rejects.toThrow()
+    await expect(
+      db.update(id, { bool: true }).if('num', 'in', { path: 'num2' as any })
+    ).resolves.not.toThrow()
+  }
 })
 
 // misc
