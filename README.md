@@ -139,3 +139,87 @@ await db.update('new_key', { name: 'foo' }).ifExists() // throws error
 // with composite key
 await db.update(['hash', 'sort'], { data: '…' })
 ```
+
+## Condition Expressions
+
+The `put`, `update`, and `delete` operations can all include [condition expressions](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.ConditionExpressions.html).
+A condition is added by chaining `.if( [condition] )`, `andIf`, or `orIf` (`if`
+has the same behavior as `andIf`).
+
+### Comparisons
+
+`.if` accepts the arguments `operand, comparator, operand` where `comparator` is
+one of `=`, `<>`, `<`, `<=`, `>`, `>=` and `operand` is interpreted like this:
+
+If `operand` is a key specified in the schema, it will refer to that key, otherwise
+it is interpreted as a literal value. This can be overridden be specifying `operator` as
+`{ path: ... }`, or `{ literal: ... }`.
+
+I.e. `.if({ path: 'foo' }, '=', { literal: 'bar' })` will result in the DynamoDB
+expression including
+
+```js
+{ 
+  ConditionExpression: 'foo = :cv_0',
+  ExpressionAttributeValues: { ':cv_0': 'bar' }
+}
+```
+
+whereas `.if({ path: 'foo' }, '=', { path: 'bar' })` will be translated to
+
+```js
+{
+  ConditionExpression: 'foo = bar'
+}
+```
+
+which is checking if the value at `foo` equals the value at `bar`.
+
+Assuming the schema declared a key `foo` and doesn't include a key `bar`, calling
+`.if('foo', '=', 'bar')` will result in the former expression.
+
+Other than the listed binary comparisons, `if` also accepts the arguments
+`if(a, 'between', b, c)` which checks if `b ≤ a ≤ c`, and `if(a, 'in', ...list)`
+which checks if `a` matches any of the operands in `list`.
+
+### Negating conditions
+
+All conditions can be negated by chaining `.not` after `.if`, `.andIf`, or `.orIf`.
+E.g. `.if.not(foo, '<', bar)` will result in the condition expression `NOT (foo < bar)`, which is functionally equivalent to `foo >= bar`.
+
+`.not` can also be chained to itself to negate a condition multiple times.
+
+### Functions
+
+All the DynamoDB condition functions can be accessed as `.if.[function](...args)`.
+
+The available functions are:
+
+Function | Description
+---|---
+`attributeExists(path)` | True if the item contains the attribute specified by `path`.
+`attributeNotExits(path)` | True if the attribute specified by `path` does not exist in the item.
+`attributeType(path, type)` | True if the attribute at `path` is of `type`. <br>`type` can be any of:<br><ul><li>`'S'` - String</li><li>`'SS'` - String Set</li><li>`'N'` - Number</li><li>`'NS'` - Number Set</li><li>`'B'` - Binary</li><li>`'BS'` - Binary Set</li><li>`'BOOL'` - Boolean</li><li>`'NULL'` - Null</li><li>`'L'` - List</li><li>`'M'` - Map</li></ul>
+`beginsWith(path, substr)` | True if the attribute specified by `path` begins with `substr`.
+`contains(path, operand)` | True if attribute at `path` is a string or set containing `operand`.
+
+The `size` function can be used in any operand by specifying the operand as
+`{ size: <path> }`, i.e. `if({size: 'foo'}, '<', 5)` will check if the size of
+the attribute at path `'foo'` is smaller than 5, and `if({size: 'listA'}, '>', {size: 'listB'})` might be used to check if `listA` has more elements than `listB`.
+
+
+### Grouping
+
+The `if`, `orIf`, `andIf`, and `not` methods can all be alternatively invoked by 
+passing a callback that takes the current chain as its first argument. All 
+conditions specified inside the callback will be grouped together.
+
+```js
+// (foo AND bar) OR baz
+.if(foo).andIf(bar).orIf(baz)
+
+// foo AND (bar OR baz)
+.if(foo).andIf(chain => chain.if(bar).orIf(baz))
+```
+
+

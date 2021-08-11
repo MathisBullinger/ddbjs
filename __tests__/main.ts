@@ -520,6 +520,251 @@ test('scan & truncate', async () => {
   await expect(count(scanDBComp)).resolves.toBe(0)
 })
 
+// condition expressions
+
+test('conditions', async () => {
+  {
+    const id = ranId()
+    await db.put({ id, bool: true, num: 0 })
+
+    await expect(
+      db.update(id, { num: 1 }).if('bool', '=', false).debug()
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { num: 2 }).if('bool', '=', false)
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { num: 3 }).if('bool', '<>', true)
+    ).rejects.toThrow()
+
+    await expect(db.get(id)).resolves.toMatchObject({ num: 0 })
+
+    await expect(
+      db.update(id, { num: 4 }).if('bool', '=', true)
+    ).resolves.toBeUndefined()
+
+    await expect(db.get(id)).resolves.toMatchObject({ num: 4 })
+  }
+
+  {
+    const id = ranId()
+    await db.put({ id, num: 5 })
+
+    await expect(db.update(id, { num: 6 }).if('num', '=', 7)).rejects.toThrow()
+    await expect(
+      db.update(id, { num: 6 }).if('num', '=', 7).orIf('num', '=', 5)
+    ).resolves.not.toThrow()
+  }
+
+  {
+    const id = ranId()
+    await db.put({ id, data: 'foo', num: 1 })
+
+    // (false and true) or true
+    await expect(
+      db
+        .update(id, { data: 'baz' })
+        .if('data', '=', 'bar')
+        .andIf('num', '>', 0)
+        .orIf('num', '<=', 1)
+    ).resolves.not.toThrow()
+
+    // false and (true or true)
+    await expect(
+      db
+        .update(id, { data: 'baz' })
+        .if('data', '=', 'bar')
+        .andIf(v => v.if('num', '>', 0).orIf('num', '<=', 1))
+    ).rejects.toThrow()
+  }
+
+  {
+    const id = ranId()
+    await db.put({ id, data: 'foo' })
+
+    await expect(
+      db.update(id, { bool: true }).if.not('data', '=', 'foo')
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { bool: true }).if.not.not('data', '=', 'foo')
+    ).resolves.not.toThrow()
+
+    await expect(
+      db.update(id, { bool: true }).if.not.not.not('data', '=', 'foo')
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { bool: true }).if.not.not.not.not('data', '=', 'foo')
+    ).resolves.not.toThrow()
+
+    await expect(
+      db
+        .update(id, { bool: true })
+        .if.not(v => v.if('data', '=', 'bar').orIf('data', '=', 'baz'))
+    ).resolves.not.toThrow()
+
+    await expect(
+      db
+        .update(id, { bool: true })
+        .if.not('data', '=', 'foo')
+        .orIf.not('data', '<>', 'foo')
+    ).resolves.not.toThrow()
+  }
+
+  {
+    const id = ranId()
+    await db.put({ id, data: 'foo' })
+
+    await expect(
+      db.update(id, { num: 0 }).if.attributeExists('bool')
+    ).rejects.toThrow()
+    await expect(
+      db.update(id, { num: 1 }).if.attributeExists('data')
+    ).resolves.not.toThrow()
+
+    await expect(
+      db
+        .update(id, { num: 2 })
+        .if.attributeExists('bool')
+        .andIf.attributeExists('data')
+    ).rejects.toThrow()
+
+    await expect(
+      db
+        .update(id, { num: 3 })
+        .if.attributeExists('bool')
+        .orIf.attributeExists('data')
+    ).resolves.not.toThrow()
+
+    await expect(
+      db.update(id, { num: 4 }).if.not.attributeExists('bool')
+    ).resolves.not.toThrow()
+    await expect(
+      db.update(id, { num: 5 }).if.not(v => v.if.attributeExists('bool'))
+    ).resolves.not.toThrow()
+
+    await expect(
+      db.update(id, { num: 6 }).if.not.attributeExists('data')
+    ).rejects.toThrow()
+    await expect(
+      db.update(id, { num: 7 }).if.not(v => v.if.attributeExists('data'))
+    ).rejects.toThrow()
+  }
+
+  {
+    const id = ranId()
+    await db.put({
+      id,
+      data: 'abc',
+      bool: false,
+      num: 1,
+      strset: ['a', 'b', 'c'],
+    })
+
+    await expect(
+      db.update(id, { num: 2 }).if.attributeExists('data')
+    ).resolves.not.toThrow()
+    await expect(
+      db.update(id, { num: 2 }).if.attributeExists('abc')
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { num: 2 }).if.attributeNotExists('data')
+    ).rejects.toThrow()
+    await expect(
+      db.update(id, { num: 2 }).if.attributeNotExists('abc')
+    ).resolves.not.toThrow()
+
+    await expect(
+      db.update(id, { num: 2 }).if.attributeType('data', 'S')
+    ).resolves.not.toThrow()
+    await expect(
+      db.update(id, { num: 2 }).if.attributeType('data', 'N')
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { num: 2 }).if.beginsWith('data', 'ab')
+    ).resolves.not.toThrow()
+    await expect(
+      db.update(id, { num: 2 }).if.beginsWith('data', 'bc')
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { num: 2 }).if.contains('data', 'bc')
+    ).resolves.not.toThrow()
+    await expect(
+      db.update(id, { num: 2 }).if.contains('data', 'cd')
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { num: 2 }).if.contains('strset', 'b')
+    ).resolves.not.toThrow()
+    await expect(
+      db.update(id, { num: 2 }).if.contains('strset', 'd')
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { num: 2 }).if({ size: 'data' }, '>=', 3)
+    ).resolves.not.toThrow()
+    await expect(
+      db.update(id, { num: 2 }).if({ size: 'strset' }, '>', 20)
+    ).rejects.toThrow()
+  }
+
+  {
+    const id = ranId()
+    await db.put({ id, data: 'foo', strset: ['a', 'b'], subStr: 'fo' })
+
+    await expect(
+      db
+        .update(id, { bool: true })
+        .if({ size: 'data' }, '>', { size: 'strset' })
+    ).resolves.not.toThrow()
+
+    await expect(
+      db
+        .update(id, { bool: true })
+        .if({ size: 'data' }, '<=', { size: 'strset' })
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { bool: true }).if(2, '=', { size: 'strset' })
+    ).resolves.not.toThrow()
+  }
+
+  {
+    const id = ranId()
+    await db.put({ id, num: 5, num2: 5 })
+
+    await expect(
+      db.update(id, { bool: true }).if('num', 'between', 10, 15)
+    ).rejects.toThrow()
+    await expect(
+      db.update(id, { bool: true }).if('num', 'between', 3, 7)
+    ).resolves.not.toThrow()
+
+    await expect(
+      db.update(id, { bool: true }).if(7, 'between', 'num', 10)
+    ).resolves.not.toThrow()
+    await expect(
+      db.update(id, { bool: true }).if(15, 'between', 'num', 10)
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { bool: true }).if('num', 'in', 4, 5, 6)
+    ).resolves.not.toThrow()
+    await expect(
+      db.update(id, { bool: true }).if('num', 'in', 6, 7, 'a')
+    ).rejects.toThrow()
+    await expect(
+      db.update(id, { bool: true }).if('num', 'in', { path: 'num2' as any })
+    ).resolves.not.toThrow()
+  }
+})
+
 // misc
 
 test('is typescript promise', async () => {
