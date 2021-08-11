@@ -2,6 +2,7 @@ import ConditionChain from './condition'
 import { decode } from '../utils/convert'
 import { assert, ReturnValueError } from '../utils/error'
 import { oneOf } from '../utils/array'
+import * as expr from '../expression'
 import type { Fields, DBItem } from '../types'
 
 type ReturnType = 'NONE' | 'OLD'
@@ -28,6 +29,8 @@ export class DeletionChain<
         ReturnValues: 'ALL_OLD',
       }),
     }
+    Object.assign(params, expr.merge(params as any, this.buildCondition()))
+    console.log(this.buildCondition())
     super.log('delete', params)
 
     const { Attributes } = await this.client.delete(params).promise()
@@ -56,7 +59,7 @@ export class DeletionChain<
       returnType,
       debug
     ) as any
-    chain.conditions = this.cloneConditon()
+    chain.condition = this.cloneConditon()
     chain.names = { ...this.names }
     chain.values = { ...this.values }
     return chain
