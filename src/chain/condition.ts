@@ -3,20 +3,27 @@ import type { Fields, AttributeType } from '../types'
 import * as expr from '../expression'
 import * as naming from '../utils/naming'
 import partial from 'snatchblock/partial'
+import oneOf from 'snatchblock/oneOf'
 import type { λ } from 'snatchblock/types'
+
+type CompArgs<T extends Fields, U> =
+  | [a: Operand<T>, comparator: Comparator, b: Operand<T>]
+  | [cb: (chain: U) => U]
 
 type Comparator = '=' | '<>' | '<' | '<=' | '>' | '>='
 
-type CompArgs<T, U> =
-  | [
-      field: (keyof T & string) | { size: keyof T & string },
-      comparator: Comparator,
-      value: any
-    ]
-  | [cb: (chain: U) => U]
+type Operand<T extends Fields> =
+  | (keyof T & string)
+  | Literal
+  | { size: keyof T & string }
+  | { literal: Literal }
+  | { path: keyof T & string }
 
-const isCB = <T, U>(args: CompArgs<T, U>): args is [(c: U) => U] =>
-  typeof args[0] === 'function'
+type Literal = string | number | boolean | null
+
+const isCB = <T extends Fields, U>(
+  args: CompArgs<T, U>
+): args is [(c: U) => U] => typeof args[0] === 'function'
 
 type AddCond<T, F extends Fields> = ((
   ...args: CompArgs<F, ConditionChain<T, F>>
@@ -33,15 +40,51 @@ export default abstract class ConditionChain<
   T,
   F extends Fields
 > extends BaseChain<T, F> {
+  private resolveOperand(op: Operand<F>) {
+    if (typeof op === 'object' && op !== null) {
+      const key = Object.keys(op)[0]
+      if (
+        Object.keys(op).length !== 1 ||
+        !oneOf(key, 'size', 'literal', 'path')
+      )
+        throw Error('operand must have form {[path|literal|size]:...}')
+
+      if (key === 'path') return this.resolveName((op as any).path)
+      if (key === 'literal') return this.resolveValue((op as any).literal)
+      if (key === 'size')
+        return new Function('size', this.resolveName((op as any).size))
+    }
+
+    if (typeof op === 'string' && op in this.fields) return this.resolveName(op)
+    return this.resolveValue(op)
+  }
+
+  private resolveName(name: string): string {
+    if (naming.valid(name)) return name
+    const key = `#cn_${Object.keys(this.names).length}`
+    this.names[key] = name
+    return key
+  }
+
+  private resolveValue(value: unknown): string {
+    const key = `:cv_${Object.keys(this.values).length}`
+    this.values[key] = value
+    return key
+  }
+
   private ifAndOr = (
     con: 'AND' | 'OR',
     wrap: ConditionWrapper
   ): AddCond<T, F> => {
     const fun = (...args: CompArgs<F, ConditionChain<T, F>>) => {
       if (!isCB(args)) {
-        const [p, ...rest] = args
-        const field = typeof p === 'object' ? new Function('size', p.size) : p
-        this.addCondition(wrap(new Comparison(field, ...rest)), con)
+        const [a, comp, b] = args
+        this.addCondition(
+          wrap(
+            new Comparison(this.resolveOperand(a), comp, this.resolveOperand(b))
+          ),
+          con
+        )
         return this
       } else {
         const cond = this.cloneConditon()
@@ -78,16 +121,28 @@ export default abstract class ConditionChain<
     }
 
   private functions_ = {
-    attributeExists: (path: keyof F) =>
-      new Function('attribute_exists', path as string),
-    attributeNotExists: (path: keyof F) =>
-      new Function('attribute_not_exists', path as string),
-    attributeType: (path: keyof F, type: AttributeType) =>
-      new Function('attribute_type', path as string, type),
-    beginsWith: (path: keyof F, substr: string) =>
-      new Function('begins_with', path as string, substr),
-    contains: (path: keyof F, operand: unknown) =>
-      new Function('contains', path as string, operand),
+    attributeExists: (path: keyof F & string) =>
+      new Function('attribute_exists', this.resolveName(path)),
+    attributeNotExists: (path: keyof F & string) =>
+      new Function('attribute_not_exists', this.resolveName(path)),
+    attributeType: (path: keyof F & string, type: AttributeType) =>
+      new Function(
+        'attribute_type',
+        this.resolveName(path),
+        this.resolveValue(type)
+      ),
+    beginsWith: (path: keyof F & string, substr: string) =>
+      new Function(
+        'begins_with',
+        this.resolveName(path),
+        this.resolveValue(substr)
+      ),
+    contains: (path: keyof F & string, operand: unknown) =>
+      new Function(
+        'contains',
+        this.resolveName(path),
+        this.resolveValue(operand)
+      ),
   }
   private functions = new Map(Object.entries(this.functions_))
 
@@ -110,42 +165,22 @@ export default abstract class ConditionChain<
 
   protected condition?: ConditionList
 
+  protected names: Record<string, string> = {}
+  protected values: Record<string, unknown> = {}
+
   protected buildCondition(): expr.ConditionExpression | undefined {
-    if (!this.condition) return
-
-    const ExpressionAttributeNames: Record<string, any> = {}
-    const ExpressionAttributeValues: Record<string, any> = {}
-
-    const ConditionExpression = this.serialize(
-      this.condition,
-      name => {
-        if (naming.valid(name)) return name
-        const key = `#cn_${Object.keys(ExpressionAttributeNames).length}`
-        ExpressionAttributeNames[key] = name
-        return key
-      },
-      value => {
-        const key = `:cv_${Object.keys(ExpressionAttributeValues).length}`
-        ExpressionAttributeValues[key] = value
-        return key
+    if (this.condition)
+      return {
+        ExpressionAttributeNames: this.names,
+        ExpressionAttributeValues: this.values,
+        ConditionExpression: this.serialize(this.condition),
       }
-    )
-
-    return {
-      ExpressionAttributeNames,
-      ExpressionAttributeValues,
-      ConditionExpression,
-    }
   }
 
-  private serialize(
-    cond: ConditionList,
-    name: (key: string) => string,
-    value: (value: unknown) => string
-  ): string {
-    if (cond instanceof Condition) return cond.expr(name, value)
+  private serialize(cond: ConditionList): string {
+    if (cond instanceof Condition) return cond.expr()
     return [cond[0], cond[2]]
-      .map(v => `(${this.serialize(v, name, value)})`)
+      .map(v => `(${this.serialize(v)})`)
       .join(` ${cond[1]} `)
   }
 
@@ -178,41 +213,36 @@ type ConditionList = Condition | [ConditionList, 'AND' | 'OR', ConditionList]
 type ConditionWrapper = (condition: ConditionList) => ConditionList
 
 abstract class Condition {
-  abstract expr(
-    name: (key: string) => string,
-    value: (value: unknown) => string
-  ): string
+  abstract expr(): string
 }
 
 class Comparison extends Condition {
   constructor(
-    private readonly a: string | Condition,
+    private readonly a: Literal | Condition,
     private readonly comp: Comparator,
-    private readonly b: unknown
+    private readonly b: Literal | Condition
   ) {
     super()
   }
 
-  expr(name: (key: string) => string, value: (value: unknown) => string) {
-    const a = this.a instanceof Condition ? this.a.expr(name, value) : this.a
-    return `${name(a)} ${this.comp} ${value(this.b)}`
+  expr() {
+    const [a, b] = [this.a, this.b].map(v =>
+      v instanceof Condition ? v.expr() : v
+    )
+    return `${a} ${this.comp} ${b}`
   }
 }
 
 class Negated extends Condition {
   constructor(
     private readonly condition: ConditionList,
-    private readonly serialize: (
-      condition: ConditionList,
-      name: (key: string) => string,
-      value: (value: unknown) => string
-    ) => string
+    private readonly serialize: (condition: ConditionList) => string
   ) {
     super()
   }
 
-  expr(name: (key: string) => string, value: (value: unknown) => string) {
-    return `NOT (${this.serialize(this.condition, name, value)})`
+  expr() {
+    return `NOT (${this.serialize(this.condition)})`
   }
 }
 
@@ -227,9 +257,9 @@ class Function extends Condition {
     super()
   }
 
-  expr(name: (key: string) => string, value: (value: unknown) => string) {
-    const args = [name(this.path)]
-    if (this.arg !== Function.none) args.push(value(this.arg))
+  expr() {
+    const args: any[] = [this.path]
+    if (this.arg !== Function.none) args.push(this.arg)
     return `${this.name}(${args.join(',')})`
   }
 }

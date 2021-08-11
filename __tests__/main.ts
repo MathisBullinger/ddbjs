@@ -710,8 +710,29 @@ test('conditions', async () => {
       db.update(id, { num: 2 }).if({ size: 'data' }, '>=', 3)
     ).resolves.not.toThrow()
     await expect(
-      db.update(id, { num: 2 }).if({ size: 'num' }, '>', 5)
+      db.update(id, { num: 2 }).if({ size: 'strset' }, '>', 20)
     ).rejects.toThrow()
+  }
+
+  {
+    const id = ranId()
+    await db.put({ id, data: 'foo', strset: ['a', 'b'], subStr: 'fo' })
+
+    await expect(
+      db
+        .update(id, { bool: true })
+        .if({ size: 'data' }, '>', { size: 'strset' })
+    ).resolves.not.toThrow()
+
+    await expect(
+      db
+        .update(id, { bool: true })
+        .if({ size: 'data' }, '<=', { size: 'strset' })
+    ).rejects.toThrow()
+
+    await expect(
+      db.update(id, { bool: true }).if(2, '=', { size: 'strset' })
+    ).resolves.not.toThrow()
   }
 })
 

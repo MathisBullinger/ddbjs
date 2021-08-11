@@ -103,7 +103,7 @@ export class UpdateChain<
   ifExists() {
     let chain = this
     for (const [k, v] of Object.entries(this.update.key))
-      chain = chain.if(k as any, '=', v) as any
+      chain = chain.if(k, '=', { literal: v as any }) as any
     return chain
   }
 
@@ -131,6 +131,8 @@ export class UpdateChain<
       debug
     ) as any
     chain.condition = this.cloneConditon()
+    chain.names = { ...this.names }
+    chain.values = { ...this.values }
     return chain
   }
 }

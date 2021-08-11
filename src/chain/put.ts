@@ -75,7 +75,9 @@ export class PutChain<
       returnType,
       debug
     ) as any
-    chain.conditions = chain.cloneConditon()
+    chain.conditions = this.cloneConditon()
+    chain.names = { ...this.names }
+    chain.values = { ...this.values }
     return chain
   }
 }
