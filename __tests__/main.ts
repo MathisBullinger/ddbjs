@@ -214,9 +214,9 @@ test('batch delete', async () => {
 
 test('update item', async () => {
   const id = ranId()
-  await db.put({ id, foo: 'a' })
-  await expect(db.update(id, { foo: 'b', bar: 'baz' })).resolves.toBeUndefined()
-  await expect(db.get(id)).resolves.toEqual({ id, foo: 'b', bar: 'baz' })
+  await db.put({ id, data: 'a', num: 2 })
+  await expect(db.update(id, { data: 'b', num: 3 })).resolves.toBeUndefined()
+  await expect(db.get(id)).resolves.toEqual({ id, data: 'b', num: 3 })
 })
 
 test('update reserved key', async () => {
@@ -297,14 +297,29 @@ test('delete attribute', async () => {
   await expect(db.get(obj.id)).resolves.toEqual(obj)
 
   obj.y = 'y'
-  await expect(db.update(obj.id, { y: 'y' }).returning('NEW')).resolves.toEqual(
-    obj
-  )
+  await expect(
+    db.update(obj.id, { y: 'y' } as any).returning('NEW')
+  ).resolves.toEqual(obj)
   delete obj.y
   await expect(db.update(obj.id).remove('y').returning('NEW')).resolves.toEqual(
     obj
   )
   await expect(db.get(obj.id)).resolves.toEqual(obj)
+})
+
+// update nested
+
+test('update nested', async () => {
+  const id = ranId()
+  await db.put({ id, map: { num: 2, str: 'foo' } })
+
+  await expect(
+    db.update(id, { 'map.str': 'bar' }).returning('NEW')
+  ).resolves.toEqual({ id, map: { num: 2, str: 'bar' } })
+
+  await expect(
+    db.update(id).add({ 'map.num': 1 }).returning('NEW')
+  ).resolves.toEqual({ id, map: { num: 3, str: 'bar' } })
 })
 
 // update number
@@ -361,7 +376,7 @@ test('explicit Set', async () => {
     db.put({ id: 'expset', explset: ['a'] }).cast({ explset: 'Set' })
   ).resolves.not.toThrow()
   await expect(
-    db.update('expset', { explset: ['a', 'a'] }).cast({ explset: 'Set' })
+    db.update('expset', { explset: ['a', 'a'] } as any).cast({ explset: 'Set' })
   ).rejects.toThrow()
 
   await expect(

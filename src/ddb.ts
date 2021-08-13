@@ -117,14 +117,14 @@ export class DDB<
     key: FlatKeyValue<T, F>,
     update?: U
   ): UpdateChain<T, 'NONE', F> {
-    const remove = update?.$remove
-    delete update?.$remove
-    const add = update?.$add
-    delete update?.$add
-    const del = update?.$delete
-    delete update?.$delete
+    const remove: string[] = (update as any)?.$remove
+    delete (update as any)?.$remove
+    const add = (update as any)?.$add
+    delete (update as any)?.$add
+    const del = (update as any)?.$delete
+    delete (update as any)?.$delete
 
-    return new UpdateChain(this.fields, this.client, {
+    return new (UpdateChain as any)(this.fields, this.client, {
       table: this.table,
       key: this.buildKey(
         ...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>)

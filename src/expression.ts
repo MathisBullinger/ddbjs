@@ -40,11 +40,16 @@ export const buildPairs = (
     for (let i = 0; i < entries.length; i++) {
       const [key, value] = entries[i]
       const av = `:${prefix}${i}`
-      let name = key
-      if (!naming.valid(name)) {
-        name = `#${prefix}${Object.keys(ExpressionAttributeNames).length}`
-        ExpressionAttributeNames[name] = key
-      }
+      const name = naming.join(
+        ...naming.parts(key).map(v => {
+          if (v.startsWith('[') || naming.valid(v)) return v
+          const key = `#${prefix}${
+            Object.keys(ExpressionAttributeNames).length
+          }`
+          ExpressionAttributeNames[key] = v
+          return key
+        })
+      )
       pairs.push([name, av, key])
       ExpressionAttributeValues[av] = value
     }

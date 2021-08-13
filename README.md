@@ -8,7 +8,7 @@ This library provides a friendlier API for DynamoDB.
 npm install idb
 ```
 
-Then, using a bundler like Webpack or Rollup, import like this:
+Then, using a bundler like Webpack or Rollup, import as:
 
 ```js
 import { DDB } from 'ddbjs'
@@ -26,15 +26,11 @@ const db = new DDB(name, schema, params)
 
 - `name`: Name of DynamoDB table.
 - `schema`: The "schema" of the database. This must include which field(s) are used as key and their respective types. See [schema](#schema) for more information.
-- `params` (optional): Parameters passed to DynamoDB document client.
-  E.g.:
-  ```js
-  { region: 'localhost', endpoint: 'http://localhost:4567' }
-  ```
+- `params` (optional): [Parameters](https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/DynamoDB/DocumentClient.html#constructor-property) passed to DynamoDB document client.
 
 ## Schema
 
-In the schema you can define which attributes exist and what their types are. This is required for the attributes that are used as key, but optional for everything else (since DynamoDB does not have a fixed schema, you can of course always pass attributes that aren't declared in the schema). The schema you pass in is also used to generate static types in TypeScript. You must specify which attribute(s) are used as hash and partition key in the `key` field. If the `key` is a string, it is used as hash key. If you use a sort key you must declare them like this `key: ['<hash>', '<sort>']`.
+In the schema you can define which attributes exist and what their types are. This is required for the attributes that are used as key, but optional for everything else (since DynamoDB does not have a fixed schema, you can of course always pass attributes that aren't declared in the schema). The schema you pass in is also used to generate static types in TypeScript. You must specify which attribute(s) are used as hash and partition key in the `[DDBKey]` field (`[DDBKey]` is a symbol exportet from the library, you can also access it as the static `DDB.key` property). If the `[DDBKey]` is a string, it is used as hash key. If you use a sort key you must declare them like this `[DDBKey]: ['<hash>', '<sort>']`.
 
 The [DynamoDB data types](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/HowItWorks.NamingRulesDataTypes.html) are declared as following:
 
@@ -47,7 +43,7 @@ The [DynamoDB data types](https://docs.aws.amazon.com/amazondynamodb/latest/deve
 | List    | `[]`                   |
 | Map     | `{}`                   |
 
-You must declare sets in the schema, otherwise when you insert an array it is assumed to be a list.
+If you use sets, you must declare them as such in the schema to be able to insert or update them as a regular array. Otherwise, the library will assume that the array you're inserting is a list, or you have to explicitly `cast` it to a set for that operation.
 
 ### Casting List <-> Set
 
@@ -63,7 +59,7 @@ _A users table that uses the `id` attribute as partition key:_
 
 ```js
 {
-  key: 'id',
+  [DDB.Key]: 'id',
   id: String,
   age: Number,
   tags: [Number], // a set of numbers
@@ -71,11 +67,11 @@ _A users table that uses the `id` attribute as partition key:_
 }
 ```
 
-_A table that uses key (`pk` as partition key and `sk` as sort key`):_
+_A table that uses key (`pk` as partition key and `sk` as sort key):_
 
 ```js
 {
-  key: ['pk', 'sk'],
+  [DDB.Key]: ['pk', 'sk'],
   pk: String,
   sk: Number,
 }

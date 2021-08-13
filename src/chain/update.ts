@@ -43,7 +43,7 @@ export class UpdateChain<
     Object.assign(
       params,
       expr.merge(
-        expr.set(this.update.set),
+        expr.set(this.update.set as any),
         expr.remove(...(this.update.remove ?? [])),
         expr.add(
           this.update.add &&
@@ -123,7 +123,7 @@ export class UpdateChain<
     update = this.update,
     returnType = this.returnType
   ) {
-    const chain = new UpdateChain(
+    const chain = new (UpdateChain as any)(
       fields,
       this.client,
       update,

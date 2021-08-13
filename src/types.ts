@@ -1,6 +1,6 @@
 import { DDBKey } from './ddb'
-import type { Primitive } from 'snatchblock/types'
 export type KeySym = typeof DDBKey
+import type { Prefix } from 'snatchblock/types'
 
 export type Schema<T extends Fields> = T & Readonly<{ [DDBKey]: Key<T> }>
 
@@ -46,19 +46,17 @@ export type SchemaValue<T extends SchemaValueType> =
 
 export type KeyValue<
   T extends Schema<F>,
-  F extends Fields = Omit<T, typeof DDBKey>
-> = T[typeof DDBKey] extends CompositeKey<F>
-  ? [SchemaValue<F[T[typeof DDBKey][0]]>, SchemaValue<F[T[typeof DDBKey][1]]>]
-  : T[typeof DDBKey] extends keyof F
-  ? [SchemaValue<F[T[typeof DDBKey]]>]
+  F extends Fields = Omit<T, KeySym>
+> = T[KeySym] extends CompositeKey<F>
+  ? [SchemaValue<F[T[KeySym][0]]>, SchemaValue<F[T[KeySym][1]]>]
+  : T[KeySym] extends keyof F
+  ? [SchemaValue<F[T[KeySym]]>]
   : never
 
 export type FlatKeyValue<
   T extends Schema<F>,
-  F extends Fields = Omit<T, typeof DDBKey>
-> = T[typeof DDBKey] extends CompositeKey<F>
-  ? KeyValue<T, F>
-  : KeyValue<T, F>[0]
+  F extends Fields = Omit<T, KeySym>
+> = T[KeySym] extends CompositeKey<F> ? KeyValue<T, F> : KeyValue<T, F>[0]
 
 export type KeyFields<T extends Fields, K extends Key<T>> = keyof Pick<
   T,
@@ -79,18 +77,28 @@ export type DBItem<T extends Fields> = { [K in keyof T]: SchemaValue<T[K]> } &
 
 export type UpdateInput<
   T extends Schema<F>,
-  F extends Fields = Omit<T, typeof DDBKey>,
-  TI = Omit<Item<F, T[typeof DDBKey]>, KeyFields<F, T[typeof DDBKey]>>
+  F extends Fields = Omit<T, KeySym>
 > = {
-  set?: Record<string, any> & TI
+  set?: UpdateMap<F>
   remove?: string[]
   add?: Record<string, string[] | number[] | number>
   delete?: Record<string, string[] | number[]>
 }
 
+type UpdateMap<T extends Fields> = Partial<
+  {
+    [K in keyof T]?: { [K_ in K]: SchemaValue<T[K]> } &
+      (T[K] extends Fields ? MapPrefix<UpdateMap<T[K]>, K & string> : {})
+  }[keyof T]
+>
+
+type MapPrefix<T, P extends string> = {
+  [K in keyof T as `${P}.${K & string}`]: T[K]
+}
+
 export type ItemUpdate<
   T extends Schema<F>,
-  F extends Fields = Omit<T, typeof DDBKey>,
+  F extends Fields = Omit<T, KeySym>,
   U extends UpdateInput<T, F> = UpdateInput<T, F>
 > = NonNullable<U['set']> & {
   $remove?: U['remove']
