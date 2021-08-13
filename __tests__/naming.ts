@@ -1,6 +1,6 @@
 import { db, ranId, TableName } from './utils/db'
 import * as https from 'https'
-import { valid } from '../src/utils/naming'
+import { valid, parts } from '../src/utils/naming'
 import reserved from '../src/reserved'
 
 const byteLimit = 64 * 1024 - 1
@@ -58,4 +58,11 @@ test('reserved keywords', async () => {
     word = a.toLowerCase() + b.toUpperCase()
     expect(valid(word)).toBe(false)
   }
+})
+
+test('split path', () => {
+  expect(parts('foo.bar.baz')).toEqual(['foo', 'bar', 'baz'])
+  expect(parts('foo[bar].baz')).toEqual(['foo', '[bar]', 'baz'])
+  expect(parts('foo.bar[baz]')).toEqual(['foo', 'bar', '[baz]'])
+  expect(parts('foo[bar][baz]')).toEqual(['foo', '[bar]', '[baz]'])
 })

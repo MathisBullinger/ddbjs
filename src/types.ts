@@ -1,4 +1,5 @@
 import { DDBKey } from './ddb'
+import type { Primitive } from 'snatchblock/types'
 export type KeySym = typeof DDBKey
 
 export type Schema<T extends Fields> = T & Readonly<{ [DDBKey]: Key<T> }>
@@ -16,6 +17,7 @@ export type SchemaValueType =
   | [NumberConstructor]
   | []
   | { [K: string]: SchemaValueType }
+  | ObjectConstructor
 
 export type PrimitiveKeys<T extends Fields> = {
   [K in keyof T]: T[K] extends Function ? K : never
@@ -36,6 +38,8 @@ export type SchemaValue<T extends SchemaValueType> =
     ? any[]
     : T extends any[]
     ? PrimitiveConstructorType<T[number]>[]
+    : T extends ObjectConstructor
+    ? any
     : T extends Fields
     ? Item<T, never>
     : never
@@ -93,6 +97,20 @@ export type ItemUpdate<
   $add?: U['add']
   $delete?: U['delete']
 }
+
+export type KeyPath<T extends Fields> =
+  | keyof T
+  | {
+      [K in keyof T]: K extends string
+        ? T[K] extends []
+          ? `${K}[${number}]${string}`
+          : T[K] extends any[]
+          ? `${K}[${number}]`
+          : T[K] extends ObjectConstructor | Record<string, SchemaValueType>
+          ? `${K}${'[' | '.'}${string}`
+          : never
+        : never
+    }[keyof T]
 
 // generic helper types
 

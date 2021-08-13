@@ -7,3 +7,12 @@ export const valid = (name: string): boolean => {
   if (!reservedLength.includes(name.length)) return true
   return !reserved.includes(name.toUpperCase())
 }
+
+export const parts = (path: string): string[] => path.split(/(?=\[)|\./)
+
+export const join = (...parts: string[]): string => {
+  let joined = parts[0] ?? ''
+  for (let part of parts.slice(1))
+    joined += part.startsWith('[') ? part : `.${part}`
+  return joined
+}

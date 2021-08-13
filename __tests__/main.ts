@@ -765,6 +765,27 @@ test('conditions', async () => {
   }
 })
 
+test('nested condition operand', async () => {
+  const id = ranId()
+  const map = { str: 'foo', num: 2 }
+  await db.put({ id, map })
+
+  await expect(db.delete(id).if('map.str', '<>', 'foo')).rejects.toThrow()
+  await expect(db.get(id)).resolves.toEqual({ id, map })
+  await expect(db.delete(id).if('map.str', '=', 'foo')).resolves.not.toThrow()
+  await expect(db.get(id)).resolves.toEqual(undefined)
+
+  await db
+    .delete(id)
+    .if({ path: 'map.str' }, '=', 'foo')
+    .catch(() => {})
+  await db
+    .delete(id)
+    // @ts-expect-error
+    .if({ path: 'bool.str' }, '=', 'foo')
+    .catch(() => {})
+})
+
 // misc
 
 test('is typescript promise', async () => {

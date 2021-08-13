@@ -1,4 +1,4 @@
-import { DDB, DDBKey } from '../../src'
+import { DDB } from '../../src'
 import * as localDynamo from 'local-dynamo'
 import * as AWS from 'aws-sdk'
 
@@ -22,7 +22,7 @@ export const ddb = new AWS.DynamoDB(opts)
 export const db = new DDB(
   TableName,
   {
-    [DDBKey]: 'id',
+    [DDB.key]: 'id',
     id: String,
     data: String,
     num: Number,
@@ -30,6 +30,7 @@ export const db = new DDB(
     strset: [String],
     list: [],
     abc: [],
+    any: Object,
     map: {
       str: String,
       num: Number,
@@ -43,13 +44,13 @@ export const db = new DDB(
 
 export const scanDB = new DDB(
   `scan-${TableName}`,
-  { [DDBKey]: 'id', id: Number },
+  { [DDB.key]: 'id', id: Number },
   opts
 )
 
 export const scanDBComp = new DDB(
   `scan-${TableName}-comp`,
-  { [DDBKey]: ['pk', 'sk'], pk: String, sk: String },
+  { [DDB.key]: ['pk', 'sk'], pk: String, sk: String },
   opts
 )
 

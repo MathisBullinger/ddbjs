@@ -29,6 +29,7 @@ export class DDB<
 > {
   public readonly client: AWS.DynamoDB.DocumentClient
   private readonly fields: F
+  public static key: typeof DDBKey = DDBKey
 
   /**
    * @example
@@ -58,7 +59,12 @@ export class DDB<
   }
 
   public get(...key: KeyValue<T, F>): GetChain<F> {
-    return new GetChain(this.fields, this.client, this.table, this.key(...key))
+    return new GetChain(
+      this.fields,
+      this.client,
+      this.table,
+      this.buildKey(...key)
+    )
   }
 
   public batchGet(...keys: FlatKeyValue<T, F>[]): BatchGetChain<T, F> {
@@ -67,7 +73,9 @@ export class DDB<
       this.client,
       this.table,
       keys.map(key =>
-        this.key(...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>))
+        this.buildKey(
+          ...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>)
+        )
       )
     )
   }
@@ -89,7 +97,7 @@ export class DDB<
   public delete(...key: KeyValue<T, F>): DeletionChain<F, 'NONE'> {
     const params: AWS.DynamoDB.DocumentClient.DeleteItemInput = {
       TableName: this.table,
-      Key: this.key(...key),
+      Key: this.buildKey(...key),
     }
     return new DeletionChain(this.fields, this.client, params, 'NONE')
   }
@@ -100,7 +108,7 @@ export class DDB<
       this.client,
       this.table,
       keys.map(key =>
-        this.key(...((Array.isArray(key) ? key : [key]) as KeyValue<T, F>))
+        this.buildKey(...((Array.isArray(key) ? key : [key]) as KeyValue<T, F>))
       )
     )
   }
@@ -118,7 +126,7 @@ export class DDB<
 
     return new UpdateChain(this.fields, this.client, {
       table: this.table,
-      key: this.key(
+      key: this.buildKey(
         ...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>)
       ),
       set: update,
@@ -143,7 +151,7 @@ export class DDB<
       : (this.schema[DDBKey] as string[])
   }
 
-  private key(...v: KeyValue<T, F>) {
+  private buildKey(...v: KeyValue<T, F>) {
     return Object.fromEntries(this.keyFields.map((k, i) => [k, v[i]]))
   }
 

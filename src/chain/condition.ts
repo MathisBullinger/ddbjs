@@ -1,9 +1,9 @@
 import BaseChain from './base'
-import type { Fields, AttributeType } from '../types'
 import * as expr from '../expression'
 import * as naming from '../utils/naming'
 import partial from 'snatchblock/partial'
 import oneOf from 'snatchblock/oneOf'
+import type { Fields, AttributeType, KeyPath } from '../types'
 import type { λ } from 'snatchblock/types'
 
 type CondArgs<T extends Fields, U> =
@@ -15,11 +15,11 @@ type CondArgs<T extends Fields, U> =
 type Comparator = '=' | '<>' | '<' | '<=' | '>' | '>='
 
 type Operand<T extends Fields> =
-  | (keyof T & string)
+  | KeyPath<T>
   | Literal
-  | { size: keyof T & string }
+  | { size: KeyPath<T> }
   | { literal: Literal }
-  | { path: keyof T & string }
+  | { path: KeyPath<T> }
 
 type Literal = string | number | boolean | null
 
@@ -62,15 +62,20 @@ export default abstract class ConditionChain<
         return new Function('size', this.resolveName((op as any).size))
     }
 
-    if (typeof op === 'string' && op in this.fields) return this.resolveName(op)
+    if (typeof op === 'string' && op.split(/[\.\[]/)[0] in this.fields)
+      return this.resolveName(op)
     return this.resolveValue(op)
   }
 
   private resolveName(name: string): string {
-    if (naming.valid(name)) return name
-    const key = `#cn_${Object.keys(this.names).length}`
-    this.names[key] = name
-    return key
+    return naming.join(
+      ...naming.parts(name).map(v => {
+        if (v.startsWith('[') || naming.valid(v)) return v
+        const key = `#cn_${Object.keys(this.names).length}`
+        this.names[key] = v
+        return key
+      })
+    )
   }
 
   private resolveValue(value: unknown): string {
@@ -155,23 +160,23 @@ export default abstract class ConditionChain<
     }
 
   private functions_ = {
-    attributeExists: (path: keyof F & string) =>
+    attributeExists: (path: KeyPath<F> & string) =>
       new Function('attribute_exists', this.resolveName(path)),
-    attributeNotExists: (path: keyof F & string) =>
+    attributeNotExists: (path: KeyPath<F> & string) =>
       new Function('attribute_not_exists', this.resolveName(path)),
-    attributeType: (path: keyof F & string, type: AttributeType) =>
+    attributeType: (path: KeyPath<F> & string, type: AttributeType) =>
       new Function(
         'attribute_type',
         this.resolveName(path),
         this.resolveValue(type)
       ),
-    beginsWith: (path: keyof F & string, substr: string) =>
+    beginsWith: (path: KeyPath<F> & string, substr: string) =>
       new Function(
         'begins_with',
         this.resolveName(path),
         this.resolveValue(substr)
       ),
-    contains: (path: keyof F & string, operand: unknown) =>
+    contains: (path: KeyPath<F> & string, operand: unknown) =>
       new Function(
         'contains',
         this.resolveName(path),

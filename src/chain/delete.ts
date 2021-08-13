@@ -30,7 +30,6 @@ export class DeletionChain<
       }),
     }
     Object.assign(params, expr.merge(params as any, this.buildCondition()))
-    console.log(this.buildCondition())
     super.log('delete', params)
 
     const { Attributes } = await this.client.delete(params).promise()
