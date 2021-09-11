@@ -159,7 +159,7 @@ export default abstract class ConditionChain<
       return wrapped as any
     }
 
-  private functions_ = {
+  protected functions_ = {
     attributeExists: (path: KeyPath<F> & string) =>
       new Function('attribute_exists', this.resolveName(path)),
     attributeNotExists: (path: KeyPath<F> & string) =>
