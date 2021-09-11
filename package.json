@@ -1,6 +1,6 @@
 {
   "name": "ddbjs",
-  "version": "0.17.0",
+  "version": "0.17.1",
   "description": "A usable API for DynamoDB",
   "main": "index.js",
   "types": "index.d.ts",
