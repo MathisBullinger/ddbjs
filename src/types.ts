@@ -1,6 +1,5 @@
 import { DDBKey } from './ddb'
 export type KeySym = typeof DDBKey
-import type { Prefix } from 'snatchblock/types'
 
 export type Schema<T extends Fields> = T & Readonly<{ [DDBKey]: Key<T> }>
 

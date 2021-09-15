@@ -7,7 +7,7 @@ import type { Fields, DBItem } from '../types'
 
 type ReturnType = 'NONE' | 'NEW' | 'OLD'
 
-export class PutChain<
+export class Put<
   T extends Fields,
   R extends ReturnType,
   F = R extends 'NONE' ? undefined : DBItem<T>
@@ -48,7 +48,7 @@ export class PutChain<
     this.resolve(result)
   }
 
-  returning<R extends ReturnType>(v: R): PutChain<T, R> {
+  returning<R extends ReturnType>(v: R): Put<T, R> {
     assert(oneOf(v, 'NEW', 'OLD', 'NONE'), new ReturnValueError(v, 'insert'))
     return this.clone(this.fields, this._debug, v)
   }
@@ -67,7 +67,7 @@ export class PutChain<
     debug = this._debug,
     returnType = this.returnType
   ) {
-    const chain = new PutChain(
+    const chain = new Put(
       fields,
       this.client,
       this.keyFields,
@@ -76,8 +76,7 @@ export class PutChain<
       debug
     ) as any
     chain.condition = this.cloneConditon()
-    chain.names = { ...this.names }
-    chain.values = { ...this.values }
+    this.copyState(chain)
     return chain
   }
 }

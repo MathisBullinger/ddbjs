@@ -2,7 +2,7 @@ import BaseChain from './base'
 import { batch } from '../utils/array'
 import type { Schema, Fields, Item, KeySym } from '../types'
 
-export class BatchPutChain<
+export class BatchPut<
   T extends Schema<F>,
   F extends Fields = Omit<T, KeySym>
 > extends BaseChain<undefined, T> {
@@ -37,7 +37,7 @@ export class BatchPutChain<
   }
 
   protected clone(schema = this.schema, debug = this._debug): this {
-    return new BatchPutChain(
+    return new BatchPut(
       schema,
       this.client,
       this.table,

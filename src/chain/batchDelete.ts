@@ -2,10 +2,7 @@ import BaseChain from './base'
 import { batch } from '../utils/array'
 import type { Fields } from '../types'
 
-export class BatchDeleteChain<T extends Fields> extends BaseChain<
-  undefined,
-  T
-> {
+export class BatchDelete<T extends Fields> extends BaseChain<undefined, T> {
   constructor(
     schema: T,
     client: AWS.DynamoDB.DocumentClient,
@@ -34,7 +31,7 @@ export class BatchDeleteChain<T extends Fields> extends BaseChain<
   }
 
   protected clone(fields = this.fields, debug = this._debug) {
-    return new BatchDeleteChain(
+    return new BatchDelete(
       fields,
       this.client,
       this.table,

@@ -1,5 +1,7 @@
-import { clone } from '../utils/object'
 import type { Fields, ExplTypes, KeySym } from '../types'
+import BiMap from 'snatchblock/bimap'
+import { clone } from '../utils/object'
+import * as naming from '../utils/naming'
 
 export default abstract class BaseChain<
   T,
@@ -48,12 +50,28 @@ export default abstract class BaseChain<
     if (this._debug) console.log(method, params ?? '')
   }
 
-  protected static encodeKey(v: string) {
-    return Buffer.from(v).toString('hex')
+  protected attrNames = BiMap.alias('key', 'name')<string, string>()
+  protected attrValues = BiMap.alias('key', 'value')<string, unknown>()
+
+  protected name(path: string): string {
+    return naming.join(
+      ...naming
+        .parts(path)
+        .map(v =>
+          v.startsWith('[') || naming.valid(v)
+            ? v
+            : (this.attrNames.name[v] ??= `#n${this.attrNames.size}`)
+        )
+    )
   }
 
-  protected static decodeKey(v: string) {
-    return Buffer.from(v, 'hex').toString()
+  protected copyState(chain: BaseChain<any, any>) {
+    chain.attrNames = this.attrNames.clone()
+    chain.attrValues = this.attrValues.clone()
+  }
+
+  protected value(val: unknown) {
+    return this.attrValues.value.getOrSet(val, `:v${this.attrValues.size}`)
   }
 
   protected isSet(key: string, entry = this.fields): boolean {

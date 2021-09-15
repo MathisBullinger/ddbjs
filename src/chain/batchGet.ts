@@ -4,7 +4,7 @@ import * as expr from '../expression'
 import { batch } from '../utils/array'
 import type { Schema, Fields, DBItem, KeySym } from '../types'
 
-export class BatchGetChain<
+export class BatchGet<
   T extends Schema<F>,
   F extends Fields = Omit<T, KeySym>
 > extends BaseChain<DBItem<F>[], F> {
@@ -34,7 +34,7 @@ export class BatchGetChain<
 
     this.resolve(
       this.removeKeys(
-        this.shouldSort ? BatchGetChain.sortByKeys(this.keys, items) : items
+        this.shouldSort ? BatchGet.sortByKeys(this.keys, items) : items
       ).map(decode) as any
     )
   }
@@ -116,7 +116,7 @@ export class BatchGetChain<
     selected = this.selected,
     remove = this.removeFields
   ): this {
-    return new BatchGetChain(
+    return new BatchGet(
       schema as any,
       this.client,
       this.table,

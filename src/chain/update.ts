@@ -12,7 +12,7 @@ type UpdateOpts = {
   key: any
 }
 
-export class UpdateChain<
+export class Update<
   T extends Schema<F>,
   RT extends ReturnType,
   F extends Fields = Omit<T, KeySym>,
@@ -74,15 +74,13 @@ export class UpdateChain<
     this.resolve(result)
   }
 
-  remove(...fields: string[]): UpdateChain<T, RT, F, RV> {
+  remove(...fields: string[]): Update<T, RT, F, RV> {
     const update = this.update
     update.remove = [...(update.remove ?? []), ...fields]
     return this.clone(this.fields, this._debug, update)
   }
 
-  add(
-    fields: Exclude<UpdateInput<T, F>['add'], null>
-  ): UpdateChain<T, RT, F, RV> {
+  add(fields: Exclude<UpdateInput<T, F>['add'], null>): Update<T, RT, F, RV> {
     const update = this.update
     update.add = { ...update.add, ...fields }
     return this.clone(this.fields, this._debug, update)
@@ -90,13 +88,13 @@ export class UpdateChain<
 
   delete(
     fields: Exclude<UpdateInput<T, F>['delete'], null>
-  ): UpdateChain<T, RT, F, RV> {
+  ): Update<T, RT, F, RV> {
     const update = this.update
     update.delete = { ...update.delete, ...fields }
     return this.clone(this.fields, this._debug, update)
   }
 
-  returning<R extends ReturnType>(v: R): UpdateChain<T, R, F> {
+  returning<R extends ReturnType>(v: R): Update<T, R, F> {
     return this.clone(this.fields, this._debug, this.update, v)
   }
 
@@ -123,7 +121,7 @@ export class UpdateChain<
     update = this.update,
     returnType = this.returnType
   ) {
-    const chain = new (UpdateChain as any)(
+    const chain = new (Update as any)(
       fields,
       this.client,
       update,
@@ -131,8 +129,7 @@ export class UpdateChain<
       debug
     ) as any
     chain.condition = this.cloneConditon()
-    chain.names = { ...this.names }
-    chain.values = { ...this.values }
+    this.copyState(chain)
     return chain
   }
 }

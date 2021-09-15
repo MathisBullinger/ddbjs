@@ -3,7 +3,7 @@ import { decode } from '../utils/convert'
 import * as expr from '../expression'
 import type { Fields, DBItem } from '../types'
 
-export class ScanChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
+export class Scan<T extends Fields> extends BaseChain<DBItem<T>[], T> {
   constructor(
     fields: T,
     client: AWS.DynamoDB.DocumentClient,
@@ -51,7 +51,7 @@ export class ScanChain<T extends Fields> extends BaseChain<DBItem<T>[], T> {
     limit = this._limit,
     selected = this.selected
   ): this {
-    return new ScanChain(
+    return new Scan(
       fields,
       this.client,
       this.table,

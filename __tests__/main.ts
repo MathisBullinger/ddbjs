@@ -778,6 +778,29 @@ test('conditions', async () => {
       db.update(id, { bool: true }).if('num', 'in', { path: 'num2' as any })
     ).resolves.not.toThrow()
   }
+
+  {
+    const id = ranId()
+    await db.put({ id, num: 1, numA: 5, numB: 6 })
+
+    await expect(
+      db
+        .update(id)
+        .add({ num: 1 })
+        .if({ path: '' }, '<', 5)
+        .andIf({ path: 'numB' }, '>', 5)
+    ).rejects.toThrow()
+    await expect(db.get(id).select('num')).resolves.toEqual({ num: 1 })
+
+    await expect(
+      db
+        .update(id)
+        .add({ num: 1 })
+        .if({ path: 'numA' }, '<=', 5)
+        .andIf({ path: 'numB' }, '>', 5)
+    ).resolves.not.toThrow()
+    await expect(db.get(id).select('num')).resolves.toEqual({ num: 2 })
+  }
 })
 
 test('nested condition operand', async () => {
@@ -790,16 +813,27 @@ test('nested condition operand', async () => {
   await expect(db.delete(id).if('map.str', '=', 'foo')).resolves.not.toThrow()
   await expect(db.get(id)).resolves.toEqual(undefined)
 
-  await db
-    .delete(id)
-    .if({ path: 'map.str' }, '=', 'foo')
-    .catch(() => {})
-  await db
-    .delete(id)
-    // @ts-expect-error
-    .if({ path: 'bool.str' }, '=', 'foo')
-    .catch(() => {})
+  // strict path typing disabled for now to allow for dynamic paths
+  // await db
+  //   .delete(id)
+  //   .if({ path: 'map.str' }, '=', 'foo')
+  //   .catch(() => {})
+  // await db
+  //   .delete(id)
+  //   // @ts-expect-error
+  //   .if({ path: 'bool.str' }, '=', 'foo')
+  //   .catch(() => {})
 })
+
+// query
+
+// test.only('query', async () => {
+//   const id = ranId()
+//   await db.batchPut({ id, data: 'foo' }, { id, data: 'bar' })
+
+//   const res = await db.query(id)
+//   console.log(res)
+// })
 
 // misc
 

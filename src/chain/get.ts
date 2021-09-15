@@ -3,7 +3,7 @@ import { decode } from '../utils/convert'
 import * as expr from '../expression'
 import type { Fields, DBItem } from '../types'
 
-export class GetChain<T extends Fields> extends BaseChain<DBItem<T>, T> {
+export class Get<T extends Fields> extends BaseChain<DBItem<T>, T> {
   constructor(
     fields: T,
     client: AWS.DynamoDB.DocumentClient,
@@ -45,7 +45,7 @@ export class GetChain<T extends Fields> extends BaseChain<DBItem<T>, T> {
     selected?: string[],
     consistent = this.consistent
   ): this {
-    return new GetChain(
+    return new Get(
       fields,
       this.client,
       this.table,

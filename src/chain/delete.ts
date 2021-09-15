@@ -7,7 +7,7 @@ import type { Fields, DBItem } from '../types'
 
 type ReturnType = 'NONE' | 'OLD'
 
-export class DeletionChain<
+export class Delete<
   T extends Fields,
   R extends ReturnType,
   F = R extends 'NONE' ? undefined : DBItem<T>
@@ -41,7 +41,7 @@ export class DeletionChain<
     this.resolve(result)
   }
 
-  returning<R extends ReturnType>(v: R): DeletionChain<T, R> {
+  returning<R extends ReturnType>(v: R): Delete<T, R> {
     assert(oneOf(v, 'NONE', 'OLD'), new ReturnValueError(v, 'delete'))
     return this.clone(this.fields, this._debug, v)
   }
@@ -51,7 +51,7 @@ export class DeletionChain<
     debug = this._debug,
     returnType = this.returnType
   ) {
-    const chain = new DeletionChain(
+    const chain = new Delete(
       fields,
       this.client,
       this.params,
@@ -59,8 +59,7 @@ export class DeletionChain<
       debug
     ) as any
     chain.condition = this.cloneConditon()
-    chain.names = { ...this.names }
-    chain.values = { ...this.values }
+    this.copyState(chain)
     return chain
   }
 }

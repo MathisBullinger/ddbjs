@@ -1,6 +1,5 @@
 import BaseChain from './base'
 import * as expr from '../expression'
-import * as naming from '../utils/naming'
 import partial from 'snatchblock/partial'
 import oneOf from 'snatchblock/oneOf'
 import type { Fields, AttributeType, KeyPath } from '../types'
@@ -19,7 +18,7 @@ type Operand<T extends Fields> =
   | Literal
   | { size: KeyPath<T> }
   | { literal: Literal }
-  | { path: KeyPath<T> }
+  | { path: string }
 
 type Literal = string | number | boolean | null
 
@@ -56,32 +55,15 @@ export default abstract class ConditionChain<
       )
         throw Error('operand must have form {[path|literal|size]:...}')
 
-      if (key === 'path') return this.resolveName((op as any).path)
-      if (key === 'literal') return this.resolveValue((op as any).literal)
+      if (key === 'path') return this.name((op as any).path)
+      if (key === 'literal') return this.value((op as any).literal)
       if (key === 'size')
-        return new Function('size', this.resolveName((op as any).size))
+        return new Function('size', this.name((op as any).size))
     }
 
     if (typeof op === 'string' && op.split(/[\.\[]/)[0] in this.fields)
-      return this.resolveName(op)
-    return this.resolveValue(op)
-  }
-
-  private resolveName(name: string): string {
-    return naming.join(
-      ...naming.parts(name).map(v => {
-        if (v.startsWith('[') || naming.valid(v)) return v
-        const key = `#cn_${Object.keys(this.names).length}`
-        this.names[key] = v
-        return key
-      })
-    )
-  }
-
-  private resolveValue(value: unknown): string {
-    const key = `:cv_${Object.keys(this.values).length}`
-    this.values[key] = value
-    return key
+      return this.name(op)
+    return this.value(op)
   }
 
   private ifAndOr = (
@@ -161,27 +143,15 @@ export default abstract class ConditionChain<
 
   protected functions_ = {
     attributeExists: (path: KeyPath<F> & string) =>
-      new Function('attribute_exists', this.resolveName(path)),
+      new Function('attribute_exists', this.name(path)),
     attributeNotExists: (path: KeyPath<F> & string) =>
-      new Function('attribute_not_exists', this.resolveName(path)),
+      new Function('attribute_not_exists', this.name(path)),
     attributeType: (path: KeyPath<F> & string, type: AttributeType) =>
-      new Function(
-        'attribute_type',
-        this.resolveName(path),
-        this.resolveValue(type)
-      ),
+      new Function('attribute_type', this.name(path), this.value(type)),
     beginsWith: (path: KeyPath<F> & string, substr: string) =>
-      new Function(
-        'begins_with',
-        this.resolveName(path),
-        this.resolveValue(substr)
-      ),
+      new Function('begins_with', this.name(path), this.value(substr)),
     contains: (path: KeyPath<F> & string, operand: unknown) =>
-      new Function(
-        'contains',
-        this.resolveName(path),
-        this.resolveValue(operand)
-      ),
+      new Function('contains', this.name(path), this.value(operand)),
   }
   private functions = new Map(Object.entries(this.functions_))
 
@@ -204,16 +174,14 @@ export default abstract class ConditionChain<
 
   protected condition?: ConditionList
 
-  protected names: Record<string, string> = {}
-  protected values: Record<string, unknown> = {}
-
   protected buildCondition(): expr.ConditionExpression | undefined {
-    if (this.condition)
+    if (this.condition) {
       return {
-        ExpressionAttributeNames: this.names,
-        ExpressionAttributeValues: this.values,
+        ExpressionAttributeNames: Object.fromEntries(this.attrNames.key),
+        ExpressionAttributeValues: Object.fromEntries(this.attrValues.key),
         ConditionExpression: this.serialize(this.condition),
       }
+    }
   }
 
   private serialize(cond: ConditionList): string {

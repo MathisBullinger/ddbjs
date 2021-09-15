@@ -1,15 +1,5 @@
 import * as AWS from 'aws-sdk'
-import {
-  GetChain,
-  PutChain,
-  DeletionChain,
-  UpdateChain,
-  BatchGetChain,
-  BatchPutChain,
-  BatchDeleteChain,
-  ScanChain,
-  BaseChain,
-} from './chain'
+import * as chain from './chain'
 import type {
   Schema,
   Fields,
@@ -21,7 +11,7 @@ import type {
 } from './types'
 
 export const DDBKey = Symbol('key')
-BaseChain.key = DDBKey
+chain.BaseChain.key = DDBKey
 
 export class DDB<
   T extends Schema<F>,
@@ -58,8 +48,8 @@ export class DDB<
     this.keyValue = this.keyValue.bind(this)
   }
 
-  public get(...key: KeyValue<T, F>): GetChain<F> {
-    return new GetChain(
+  public get(...key: KeyValue<T, F>): chain.Get<F> {
+    return new chain.Get(
       this.fields,
       this.client,
       this.table,
@@ -67,8 +57,8 @@ export class DDB<
     )
   }
 
-  public batchGet(...keys: FlatKeyValue<T, F>[]): BatchGetChain<T, F> {
-    return new BatchGetChain(
+  public batchGet(...keys: FlatKeyValue<T, F>[]): chain.BatchGet<T, F> {
+    return new chain.BatchGet(
       this.schema,
       this.client,
       this.table,
@@ -82,28 +72,28 @@ export class DDB<
 
   public put<I extends Item<F, T[typeof DDBKey]>>(
     item: I
-  ): PutChain<F, 'NONE'> {
+  ): chain.Put<F, 'NONE'> {
     const params: AWS.DynamoDB.DocumentClient.PutItemInput = {
       TableName: this.table,
       Item: item,
     }
-    return new PutChain(this.fields, this.client, this.keyFields, params)
+    return new chain.Put(this.fields, this.client, this.keyFields, params)
   }
 
-  public batchPut(...items: Item<F, T[typeof DDBKey]>[]): BatchPutChain<T, F> {
-    return new BatchPutChain(this.schema, this.client, this.table, items)
+  public batchPut(...items: Item<F, T[typeof DDBKey]>[]): chain.BatchPut<T, F> {
+    return new chain.BatchPut(this.schema, this.client, this.table, items)
   }
 
-  public delete(...key: KeyValue<T, F>): DeletionChain<F, 'NONE'> {
+  public delete(...key: KeyValue<T, F>): chain.Delete<F, 'NONE'> {
     const params: AWS.DynamoDB.DocumentClient.DeleteItemInput = {
       TableName: this.table,
       Key: this.buildKey(...key),
     }
-    return new DeletionChain(this.fields, this.client, params, 'NONE')
+    return new chain.Delete(this.fields, this.client, params, 'NONE')
   }
 
-  public batchDelete(...keys: FlatKeyValue<T, F>[]): BatchDeleteChain<T> {
-    return new BatchDeleteChain(
+  public batchDelete(...keys: FlatKeyValue<T, F>[]): chain.BatchDelete<T> {
+    return new chain.BatchDelete(
       this.schema,
       this.client,
       this.table,
@@ -116,7 +106,7 @@ export class DDB<
   public update<U extends ItemUpdate<T, F>>(
     key: FlatKeyValue<T, F>,
     update?: U
-  ): UpdateChain<T, 'NONE', F> {
+  ): chain.Update<T, 'NONE', F> {
     const remove: string[] = (update as any)?.$remove
     delete (update as any)?.$remove
     const add = (update as any)?.$add
@@ -124,7 +114,7 @@ export class DDB<
     const del = (update as any)?.$delete
     delete (update as any)?.$delete
 
-    return new (UpdateChain as any)(this.fields, this.client, {
+    return new (chain.Update as any)(this.fields, this.client, {
       table: this.table,
       key: this.buildKey(
         ...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>)
@@ -136,8 +126,8 @@ export class DDB<
     })
   }
 
-  public scan(): ScanChain<F> {
-    return new ScanChain(this.fields, this.client, this.table)
+  public scan(): chain.Scan<F> {
+    return new chain.Scan(this.fields, this.client, this.table)
   }
 
   public async truncate() {
