@@ -42,6 +42,16 @@ export const db = new DDB(
   opts
 )
 
+export const dbComp = new DDB(
+  `${TableName}-comp`,
+  {
+    [DDB.key]: ['pk', 'sk'],
+    pk: String,
+    sk: String,
+  },
+  opts
+)
+
 export const scanDB = new DDB(
   `scan-${TableName}`,
   { [DDB.key]: 'id', id: Number },
@@ -83,6 +93,7 @@ beforeAll(async () => {
   child = localDynamo.launch(undefined, 4567)
   await Promise.all([
     createTable(db.table, ['id', 'S', 'HASH']),
+    createTable(dbComp.table, ['pk', 'S', 'HASH'], ['sk', 'S', 'RANGE']),
     createTable(scanDB.table, ['id', 'N', 'HASH']),
     createTable(scanDBComp.table, ['pk', 'S', 'HASH'], ['sk', 'S', 'RANGE']),
   ])
@@ -93,6 +104,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await ddb.deleteTable({ TableName }).promise()
+  await ddb.deleteTable({ TableName: dbComp.table }).promise()
   await ddb.deleteTable({ TableName: scanDB.table }).promise()
   await ddb.deleteTable({ TableName: scanDBComp.table }).promise()
   child?.kill()

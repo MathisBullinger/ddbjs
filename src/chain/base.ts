@@ -17,6 +17,7 @@ export default abstract class BaseChain<
   constructor(
     readonly fields: F,
     protected readonly client: AWS.DynamoDB.DocumentClient,
+    protected readonly table: string,
     protected _debug = false
   ) {
     let _resolve: any
@@ -51,7 +52,7 @@ export default abstract class BaseChain<
   }
 
   protected attrNames = BiMap.alias('key', 'name')<string, string>()
-  protected attrValues = BiMap.alias('key', 'value')<string, unknown>()
+  protected attrValues = BiMap.alias('key', 'value')<string, any>()
 
   protected name(path: string): string {
     return naming.join(
@@ -65,13 +66,32 @@ export default abstract class BaseChain<
     )
   }
 
+  protected value(val: unknown) {
+    return this.attrValues.value.getOrSet(val, `:v${this.attrValues.size}`)
+  }
+
   protected copyState(chain: BaseChain<any, any>) {
     chain.attrNames = this.attrNames.clone()
     chain.attrValues = this.attrValues.clone()
   }
 
-  protected value(val: unknown) {
-    return this.attrValues.value.getOrSet(val, `:v${this.attrValues.size}`)
+  protected createInput<T extends Record<string, any>>(
+    input?: T
+  ): T & {
+    TableName: string
+    ExpressionAttributeNames?: Record<string, string>
+    ExpressionAttributeValues?: Record<string, any>
+  } {
+    return {
+      ...input,
+      TableName: this.table,
+      ...(this.attrNames.size && {
+        ExpressionAttributeNames: Object.fromEntries(this.attrNames.key),
+      }),
+      ...(this.attrValues.size && {
+        ExpressionAttributeValues: Object.fromEntries(this.attrValues.key),
+      }),
+    } as any
   }
 
   protected isSet(key: string, entry = this.fields): boolean {

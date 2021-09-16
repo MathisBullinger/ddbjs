@@ -7,12 +7,12 @@ export class Scan<T extends Fields> extends BaseChain<DBItem<T>[], T> {
   constructor(
     fields: T,
     client: AWS.DynamoDB.DocumentClient,
-    private readonly table: string,
+    table: string,
     private readonly _limit?: number,
     private readonly selected?: string[],
     debug?: boolean
   ) {
-    super(fields, client, debug)
+    super(fields, client, table, debug)
   }
 
   async execute() {

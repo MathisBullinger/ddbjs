@@ -1,4 +1,4 @@
-import { db, ranId, scanDB, scanDBComp } from './utils/db'
+import { ranId, db, dbComp, scanDB, scanDBComp } from './utils/db'
 import type { DBRecord } from '../src/ddb'
 
 jest.setTimeout(20000)
@@ -827,13 +827,30 @@ test('nested condition operand', async () => {
 
 // query
 
-// test.only('query', async () => {
-//   const id = ranId()
-//   await db.batchPut({ id, data: 'foo' }, { id, data: 'bar' })
+test('query', async () => {
+  {
+    const id = ranId()
+    await expect(db.query(id)).resolves.toEqual([{ id }])
+  }
 
-//   const res = await db.query(id)
-//   console.log(res)
-// })
+  {
+    const pk = ranId()
+    const sks = ['a', 'b', 'foo', 'bar']
+    await dbComp.batchPut(...sks.map(sk => ({ pk, sk })))
+
+    await expect(dbComp.query(pk)).resolves.toHaveLength(sks.length)
+
+    await expect(dbComp.query(pk).where('=', 'foo')).resolves.toHaveLength(1)
+    await expect(dbComp.query(pk).where('<', 'c')).resolves.toHaveLength(3)
+    await expect(dbComp.query(pk).where('>=', 'b')).resolves.toHaveLength(3)
+    await expect(
+      dbComp.query(pk).where('begins_with', 'b')
+    ).resolves.toHaveLength(2)
+    await expect(
+      dbComp.query(pk).where('between', 'c', 'z')
+    ).resolves.toHaveLength(1)
+  }
+})
 
 // misc
 

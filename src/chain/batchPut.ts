@@ -9,11 +9,11 @@ export class BatchPut<
   constructor(
     private readonly schema: T,
     client: AWS.DynamoDB.DocumentClient,
-    private readonly table: string,
+    table: string,
     private readonly items: Item<F, T[KeySym]>[],
     debug?: boolean
   ) {
-    super(schema, client, debug)
+    super(schema, client, table, debug)
   }
 
   async execute() {

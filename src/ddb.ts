@@ -1,5 +1,6 @@
 import * as AWS from 'aws-sdk'
 import * as chain from './chain'
+import omit from 'snatchblock/omit'
 import type {
   Schema,
   Fields,
@@ -42,9 +43,7 @@ export class DDB<
       params instanceof AWS.DynamoDB.DocumentClient
         ? params
         : new AWS.DynamoDB.DocumentClient(params)
-    this.fields = Object.fromEntries(
-      Object.entries(schema).filter(([k]) => k !== 'key')
-    ) as F
+    this.fields = omit(schema, DDBKey) as any
     this.keyValue = this.keyValue.bind(this)
   }
 
@@ -128,6 +127,10 @@ export class DDB<
 
   public scan(): chain.Scan<F> {
     return new chain.Scan(this.fields, this.client, this.table)
+  }
+
+  public query(partitionKey: KeyValue<T, F>[0]): chain.Query<T, F> {
+    return new chain.Query(this.schema, this.client, this.table, partitionKey)
   }
 
   public async truncate() {

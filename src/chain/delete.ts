@@ -19,7 +19,7 @@ export class Delete<
     private readonly returnType: ReturnType = 'NONE',
     debug?: boolean
   ) {
-    super(fields, client, debug)
+    super(fields, client, params.TableName, debug)
   }
 
   async execute() {

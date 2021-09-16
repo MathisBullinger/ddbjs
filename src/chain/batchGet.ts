@@ -11,14 +11,14 @@ export class BatchGet<
   constructor(
     private readonly schema: T,
     client: AWS.DynamoDB.DocumentClient,
-    private readonly table: string,
+    table: string,
     private readonly keys: any[],
     private readonly shouldSort: boolean = false,
     private readonly selected?: string[],
     private readonly removeFields: string[] = [],
     debug?: boolean
   ) {
-    super(schema, client, debug)
+    super(schema, client, table, debug)
   }
 
   async execute() {

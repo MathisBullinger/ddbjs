@@ -29,7 +29,7 @@ export class Update<
     private readonly returnType: ReturnType = 'NONE',
     debug?: boolean
   ) {
-    super(fields, client, debug)
+    super(fields, client, update.table, debug)
   }
 
   async execute() {

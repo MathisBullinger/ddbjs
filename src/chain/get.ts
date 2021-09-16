@@ -7,13 +7,13 @@ export class Get<T extends Fields> extends BaseChain<DBItem<T>, T> {
   constructor(
     fields: T,
     client: AWS.DynamoDB.DocumentClient,
-    private readonly table: string,
+    table: string,
     private readonly key: any,
     private readonly selected?: string[],
     private readonly consistent = false,
     debug?: boolean
   ) {
-    super(fields, client, debug)
+    super(fields, client, table, debug)
   }
 
   async execute() {
