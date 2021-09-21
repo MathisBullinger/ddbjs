@@ -1,6 +1,8 @@
 import BaseChain from './base'
 import { decode } from '../utils/convert'
 import omit from 'snatchblock/omit'
+import { camel } from 'snatchblock/string'
+import type { Slice, CamelCase } from 'snatchblock/types'
 import type { Schema, Fields, DBItem, KeySym } from '../types'
 
 export class Query<
@@ -47,11 +49,19 @@ export class Query<
 
   public where: SKF extends false
     ? never
-    : KeyFilterBuilder<Query<T, F, false>> = ((...args: KeyFilterArgs) =>
+    : KeyFilterBuilder<Query<T, F, false>> = ((f: any) =>
+    Object.assign(
+      f,
+
+      Object.fromEntries(
+        filterOps.map(op => [camel(op), (...args: any[]) => f(op, ...args)])
+      )
+    ))((...args: KeyFilterArgs) =>
     this.clone(undefined, undefined, [
       args[0].toLowerCase(),
       ...args.slice(1),
-    ] as KeyFilterArgs)) as any
+    ] as KeyFilterArgs)
+  )
 
   private get pk(): string {
     const key = this.schema[BaseChain.key!]
@@ -80,13 +90,20 @@ export class Query<
   }
 }
 
-type KeyFilterOp = '=' | '<' | '<=' | '>' | '>=' | 'between' | 'begins_with'
+const filterOps = ['=', '<', '<=', '>', '>=', 'between', 'begins_with'] as const
+
+type KeyFilterOp = typeof filterOps[number]
 
 type KeyFilterArgs<T extends KeyFilterOp = any, K = unknown> = [
   op: T,
   ...args: T extends 'between' ? [a: K, b: K] : [comp: K]
 ]
 
-type KeyFilterBuilder<R> = <T extends KeyFilterOp, K>(
+type KeyFilterBuilder<R> = (<T extends KeyFilterOp, K>(
   ...args: KeyFilterArgs<T, K>
-) => R
+) => R) &
+  {
+    [K in KeyFilterOp as CamelCase<K>]: (
+      ...args: Slice<KeyFilterArgs<K>, 1>
+    ) => R
+  }

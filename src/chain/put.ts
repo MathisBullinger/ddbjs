@@ -15,12 +15,13 @@ export class Put<
   constructor(
     fields: T,
     client: AWS.DynamoDB.DocumentClient,
+    table: string,
     private readonly keyFields: string[],
     private readonly params: AWS.DynamoDB.DocumentClient.PutItemInput,
     private readonly returnType: ReturnType = 'NONE',
     debug?: boolean
   ) {
-    super(fields, client, debug)
+    super(fields, client, table, debug)
   }
 
   async execute() {
@@ -70,6 +71,7 @@ export class Put<
     const chain = new Put(
       fields,
       this.client,
+      this.table,
       this.keyFields,
       this.params,
       returnType,

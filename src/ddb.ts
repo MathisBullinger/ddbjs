@@ -76,7 +76,13 @@ export class DDB<
       TableName: this.table,
       Item: item,
     }
-    return new chain.Put(this.fields, this.client, this.keyFields, params)
+    return new chain.Put(
+      this.fields,
+      this.client,
+      this.table,
+      this.keyFields,
+      params
+    )
   }
 
   public batchPut(...items: Item<F, T[typeof DDBKey]>[]): chain.BatchPut<T, F> {

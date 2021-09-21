@@ -830,6 +830,7 @@ test('nested condition operand', async () => {
 test('query', async () => {
   {
     const id = ranId()
+    await db.put({ id })
     await expect(db.query(id)).resolves.toEqual([{ id }])
   }
 
@@ -841,13 +842,26 @@ test('query', async () => {
     await expect(dbComp.query(pk)).resolves.toHaveLength(sks.length)
 
     await expect(dbComp.query(pk).where('=', 'foo')).resolves.toHaveLength(1)
+    await expect(dbComp.query(pk).where['=']('foo')).resolves.toHaveLength(1)
+
     await expect(dbComp.query(pk).where('<', 'c')).resolves.toHaveLength(3)
+    await expect(dbComp.query(pk).where['<']('c')).resolves.toHaveLength(3)
+
     await expect(dbComp.query(pk).where('>=', 'b')).resolves.toHaveLength(3)
+    await expect(dbComp.query(pk).where['>=']('b')).resolves.toHaveLength(3)
+
     await expect(
       dbComp.query(pk).where('begins_with', 'b')
     ).resolves.toHaveLength(2)
+    await expect(dbComp.query(pk).where.beginsWith('b')).resolves.toHaveLength(
+      2
+    )
+
     await expect(
       dbComp.query(pk).where('between', 'c', 'z')
+    ).resolves.toHaveLength(1)
+    await expect(
+      dbComp.query(pk).where.between('c', 'z')
     ).resolves.toHaveLength(1)
   }
 })
