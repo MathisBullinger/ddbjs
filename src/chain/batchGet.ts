@@ -1,46 +1,46 @@
-import BaseChain from './base'
+import BaseChain, { Config } from './base'
 import { decode } from '../utils/convert'
 import * as expr from '../expression'
 import { batch } from '../utils/array'
-import type { Schema, Fields, DBItem, KeySym } from '../types'
+import type { Schema, Fields, ScFields, Projected, Field } from '../types'
+
+type BatchGetConfig<T extends Schema<any>> = Config<T> & {
+  keys: any[]
+  sort?: boolean
+  selection?: any[]
+  removeFields?: any[]
+}
 
 export class BatchGet<
-  T extends Schema<F>,
-  F extends Fields = Omit<T, KeySym>
-> extends BaseChain<DBItem<F>[], F> {
-  constructor(
-    private readonly schema: T,
-    client: AWS.DynamoDB.DocumentClient,
-    table: string,
-    private readonly keys: any[],
-    private readonly shouldSort: boolean = false,
-    private readonly selected?: string[],
-    private readonly removeFields: string[] = [],
-    debug?: boolean
-  ) {
-    super(schema, client, table, debug)
+  T extends Schema<any>,
+  S extends string | number | symbol = Field<T>
+> extends BaseChain<Projected<ScFields<T>, S>[], BatchGetConfig<T>> {
+  constructor(config: BatchGetConfig<T>) {
+    super(config, {})
   }
 
   async execute() {
-    const selected = [...(this.selected ?? [])]
+    const selected = [...(this.config.selection ?? [])]
 
     const params = expr.project(...selected)
 
     const items = (
       await Promise.all(
-        batch(this.keys, 100).map(v => this.read(v, params as any))
+        batch(this.config.keys, 100).map(v => this.read(v, params as any))
       )
     ).flat()
 
     this.resolve(
       this.removeKeys(
-        this.shouldSort ? BatchGet.sortByKeys(this.keys, items) : items
+        this.config.sort ? BatchGet.sortByKeys(this.config.keys, items) : items
       ).map(decode) as any
     )
   }
 
-  public select(...fields: string[]): this {
-    return this.clone(this.schema, this._debug, this.shouldSort, fields)
+  public select<Fields extends string>(
+    ...fields: Fields[]
+  ): BatchGet<T, Fields> {
+    return this.clone({ selection: fields }) as any
   }
 
   private async read(
@@ -51,7 +51,7 @@ export class BatchGet<
 
     const payload = {
       RequestItems: {
-        [this.table]: {
+        [this.config.table]: {
           Keys,
           ...params,
         },
@@ -59,34 +59,38 @@ export class BatchGet<
     }
     super.log('batchGet', payload)
 
-    const { Responses, UnprocessedKeys } = await this.client
+    const { Responses, UnprocessedKeys } = await this.config.client
       .batchGet(payload)
       .promise()
 
     return [
-      ...(Responses?.[this.table] ?? []),
-      ...(await this.read(UnprocessedKeys?.[this.table]?.Keys)),
+      ...(Responses?.[this.config.table] ?? []),
+      ...(await this.read(UnprocessedKeys?.[this.config.table]?.Keys)),
     ]
   }
 
   public sort() {
-    const keyFields = [this.schema[BaseChain.key!]].flat() as string[]
-    return this.clone(
-      this.schema,
-      this._debug,
-      true,
-      this.selected && [...this.selected, ...keyFields],
-      this.selected && keyFields.filter(v => !this.selected!.includes(v))
-    )
+    const keyFields = [
+      (this.config.schema as Schema<Fields>)[BaseChain.key!],
+    ].flat()
+    return this.clone({
+      sort: true,
+      ...(this.config.selection && {
+        selection: [...this.config.selection, ...keyFields],
+        removeFields: keyFields.filter(
+          v => !this.config.selection!.includes(v)
+        ),
+      }),
+    })
   }
 
   private removeKeys<T>(items: T[]): T[] {
-    if (!this.removeFields?.length) return items
+    if (!this.config.removeFields?.length) return items
     return items.map(
       v =>
         Object.fromEntries(
           Object.entries(v).map(([k, v]) =>
-            this.removeFields.includes(k) ? [] : [k, v]
+            this.config.removeFields!.includes(k) ? [] : [k, v]
           )
         ) as T
     )
@@ -107,24 +111,5 @@ export class BatchGet<
 
     sorted.push(...remaining)
     return sorted
-  }
-
-  protected clone(
-    schema = this.schema,
-    debug = this._debug,
-    sort = false,
-    selected = this.selected,
-    remove = this.removeFields
-  ): this {
-    return new BatchGet(
-      schema as any,
-      this.client,
-      this.table,
-      this.keys,
-      sort,
-      selected,
-      remove,
-      debug
-    ) as any
   }
 }

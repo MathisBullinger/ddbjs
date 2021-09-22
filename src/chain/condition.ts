@@ -1,8 +1,8 @@
-import BaseChain from './base'
+import BaseChain, { Config, UtilFlags } from './base'
 import * as expr from '../expression'
 import partial from 'snatchblock/partial'
 import oneOf from 'snatchblock/oneOf'
-import type { Fields, AttributeType, KeyPath } from '../types'
+import type { Fields, AttributeType, KeyPath, ScFields } from '../types'
 import type { λ } from 'snatchblock/types'
 
 type CondArgs<T extends Fields, U> =
@@ -31,22 +31,32 @@ const isComp = <T extends Fields, U>(
 ): args is [a: Operand<T>, comparator: Comparator, b: Operand<T>] =>
   args.length === 3
 
-type AddCond<T, F extends Fields> = ((
-  ...args: CondArgs<F, ConditionChain<T, F>>
-) => ConditionChain<T, F>) & { not: AddCond<T, F> } & MapReturn<
-    ConditionChain<T, F>['functions_'],
-    ConditionChain<T, F>
+type AddCond<R, T extends Config<any>, U> = ((
+  ...args: CondArgs<F<T>, ConditionChain<R, T, U>>
+) => ConditionChain<R, T, U>) & { not: AddCond<R, T, U> } & MapReturn<
+    ConditionChain<R, T, U>['functions_'],
+    ConditionChain<R, T, U>
   >
 
 type MapReturn<T extends Record<string, λ>, R> = {
   [K in keyof T]: λ<Parameters<T[K]>, R>
 }
 
+type F<T extends Config<any>> = ScFields<T['schema']>
+
 export default abstract class ConditionChain<
-  T,
-  F extends Fields
-> extends BaseChain<T, F> {
-  private resolveOperand(op: Operand<F>) {
+  R,
+  C extends Config<any>,
+  U extends UtilFlags
+> extends BaseChain<R, C, U> {
+  constructor(config: C, flags: U) {
+    super(config, flags)
+    this.onCloneHooks.push(chain => {
+      chain.condition = this.cloneConditon()
+    })
+  }
+
+  private resolveOperand(op: Operand<F<C>>) {
     if (typeof op === 'object' && op !== null) {
       const key = Object.keys(op)[0]
       if (
@@ -61,7 +71,7 @@ export default abstract class ConditionChain<
         return new Function('size', this.name((op as any).size))
     }
 
-    if (typeof op === 'string' && op.split(/[\.\[]/)[0] in this.fields)
+    if (typeof op === 'string' && op.split(/[\.\[]/)[0] in this.config.schema)
       return this.name(op)
     return this.value(op)
   }
@@ -69,8 +79,8 @@ export default abstract class ConditionChain<
   private ifAndOr = (
     con: 'AND' | 'OR',
     wrap: ConditionWrapper
-  ): AddCond<T, F> => {
-    const fun = (...args: CondArgs<F, ConditionChain<T, F>>) => {
+  ): AddCond<R, C, U> => {
+    const fun = (...args: CondArgs<F<C>, ConditionChain<R, C, U>>) => {
       if (isCB(args)) {
         const cond = this.cloneConditon()
         delete this.condition
@@ -142,15 +152,15 @@ export default abstract class ConditionChain<
     }
 
   protected functions_ = {
-    attributeExists: (path: KeyPath<F> & string) =>
+    attributeExists: (path: KeyPath<F<C>> & string) =>
       new Function('attribute_exists', this.name(path)),
-    attributeNotExists: (path: KeyPath<F> & string) =>
+    attributeNotExists: (path: KeyPath<F<C>> & string) =>
       new Function('attribute_not_exists', this.name(path)),
-    attributeType: (path: KeyPath<F> & string, type: AttributeType) =>
+    attributeType: (path: KeyPath<F<C>> & string, type: AttributeType) =>
       new Function('attribute_type', this.name(path), this.value(type)),
-    beginsWith: (path: KeyPath<F> & string, substr: string) =>
+    beginsWith: (path: KeyPath<F<C>> & string, substr: string) =>
       new Function('begins_with', this.name(path), this.value(substr)),
-    contains: (path: KeyPath<F> & string, operand: unknown) =>
+    contains: (path: KeyPath<F<C>> & string, operand: unknown) =>
       new Function('contains', this.name(path), this.value(operand)),
   }
   private functions = new Map(Object.entries(this.functions_))
@@ -202,7 +212,7 @@ export default abstract class ConditionChain<
     wrap: ConditionWrapper = v => v
   ) {
     const negate = (v: any) => wrap(new Negated(v, this.serialize.bind(this)))
-    const negated = (...args: CondArgs<F, ConditionChain<T, F>>) => {
+    const negated = (...args: CondArgs<F<C>, ConditionChain<R, C, U>>) => {
       return this.conditionFactory(f)(negate)(...args)
     }
     Reflect.defineProperty(negated, 'not', {

@@ -1,32 +1,32 @@
-import BaseChain from './base'
+import BaseChain, { Config } from './base'
 import { decode } from '../utils/convert'
-import omit from 'snatchblock/omit'
 import { camel } from 'snatchblock/string'
 import type { Slice, CamelCase } from 'snatchblock/types'
-import type { Schema, Fields, DBItem, KeySym } from '../types'
+import type { Schema, KeySym, ScItem } from '../types'
+
+type QueryConfig<T extends Schema<any>> = Config<T> & {
+  key: any
+  keyFilter?: KeyFilterArgs
+}
 
 export class Query<
-  T extends Schema<F>,
-  F extends Fields,
-  SKF extends boolean = T[KeySym] extends any[] ? true : false
-> extends BaseChain<DBItem<T>[], T> {
-  constructor(
-    private readonly schema: T,
-    client: AWS.DynamoDB.DocumentClient,
-    table: string,
-    private readonly keyValue: any,
-    private readonly keyFilter?: KeyFilterArgs,
-    debug?: boolean
-  ) {
-    super(omit(schema, BaseChain.key!) as any, client, table, debug)
+  T extends Schema<any>,
+  SKF extends boolean = KeySym extends keyof T
+    ? T[KeySym] extends any[]
+      ? true
+      : false
+    : false
+> extends BaseChain<ScItem<T>[], QueryConfig<T>> {
+  constructor(config: QueryConfig<T>) {
+    super(config, {})
   }
 
   async execute() {
     let KeyConditionExpression = `${this.name(this.pk)}=${this.value(
-      this.keyValue
+      this.config.key
     )}`
-    if (this.keyFilter) {
-      const [op, ...raw] = this.keyFilter
+    if (this.config.keyFilter) {
+      const [op, ...raw] = this.config.keyFilter
       const args = raw.map(v => this.value(v))
       const key = this.name(this.sk)
 
@@ -43,50 +43,33 @@ export class Query<
     const params = this.createInput({ KeyConditionExpression })
     super.log('query', params)
 
-    const res = await this.client.query(params).promise()
+    const res = await this.config.client.query(params).promise()
     this.resolve(res.Items?.map(decode) as any)
   }
 
-  public where: SKF extends false
-    ? never
-    : KeyFilterBuilder<Query<T, F, false>> = ((f: any) =>
-    Object.assign(
-      f,
+  public where: SKF extends false ? never : KeyFilterBuilder<Query<T, false>> =
+    ((f: any) =>
+      Object.assign(
+        f,
 
-      Object.fromEntries(
-        filterOps.map(op => [camel(op), (...args: any[]) => f(op, ...args)])
-      )
-    ))((...args: KeyFilterArgs) =>
-    this.clone(undefined, undefined, [
-      args[0].toLowerCase(),
-      ...args.slice(1),
-    ] as KeyFilterArgs)
-  )
+        Object.fromEntries(
+          filterOps.map(op => [camel(op), (...args: any[]) => f(op, ...args)])
+        )
+      ))((...args: KeyFilterArgs) =>
+      this.clone({
+        keyFilter: [args[0].toLowerCase(), ...args.slice(1)] as KeyFilterArgs,
+      })
+    )
 
   private get pk(): string {
-    const key = this.schema[BaseChain.key!]
+    const key = (this.config.schema as any)[BaseChain.key!]
     return Array.isArray(key) ? key[0] : (key as any)
   }
 
   private get sk(): string {
-    const key = this.schema[BaseChain.key!]
+    const key = (this.config.schema as any)[BaseChain.key!]
     if (!Array.isArray(key) || key.length < 2) throw Error("doesn't have sk")
     return key[1] as string
-  }
-
-  protected clone(
-    _?: Fields,
-    debug?: boolean,
-    keyFilter?: KeyFilterArgs
-  ): this {
-    return new Query(
-      this.schema as any,
-      this.client,
-      this.table,
-      this.keyValue,
-      keyFilter ?? this.keyFilter,
-      debug ?? this._debug
-    ) as any
   }
 }
 

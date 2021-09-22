@@ -19,6 +19,14 @@ test('get select fields', async () => {
   await db.put({ id, a: 'b', c: 'd', e: 'f', data: 'foo' })
   await expect(db.get(id).select('a', 'c')).resolves.toEqual({ a: 'b', c: 'd' })
   await expect(db.get(id).select('data')).resolves.toEqual({ data: 'foo' })
+
+  const item = await db.get(id).select('data', 'foo')
+  const dataStr: string = item.data
+  // @ts-expect-error
+  const dataNum: number = item.data
+  // @ts-expect-error
+  const num = item.num
+  const foo = item.foo
 })
 
 test('get (strongly consistent)', async () => {

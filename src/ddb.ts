@@ -8,7 +8,7 @@ import type {
   Item,
   ItemUpdate,
   FlatKeyValue,
-  DBItem,
+  ScItem,
 } from './types'
 
 export const DDBKey = Symbol('key')
@@ -47,71 +47,61 @@ export class DDB<
     this.keyValue = this.keyValue.bind(this)
   }
 
-  public get(...key: KeyValue<T, F>): chain.Get<F> {
-    return new chain.Get(
-      this.fields,
-      this.client,
-      this.table,
-      this.buildKey(...key)
+  private config = <T>(cst: T) => ({
+    schema: this.schema,
+    client: this.client,
+    table: this.table,
+    ...cst,
+  })
+
+  public get = (...key: KeyValue<T, F>) =>
+    new chain.Get(this.config({ key: this.buildKey(...key) }))
+
+  public batchGet = (...keys: FlatKeyValue<T, F>[]) =>
+    new chain.BatchGet(
+      this.config({
+        keys: keys.map(key =>
+          this.buildKey(
+            ...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>)
+          )
+        ),
+      })
     )
-  }
 
-  public batchGet(...keys: FlatKeyValue<T, F>[]): chain.BatchGet<T, F> {
-    return new chain.BatchGet(
-      this.schema,
-      this.client,
-      this.table,
-      keys.map(key =>
-        this.buildKey(
-          ...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>)
-        )
-      )
+  public put = <I extends ScItem<T>>(item: I) =>
+    new chain.Put(
+      this.config({
+        return: 'NONE',
+        item,
+      })
     )
-  }
 
-  public put<I extends Item<F, T[typeof DDBKey]>>(
-    item: I
-  ): chain.Put<F, 'NONE'> {
-    const params: AWS.DynamoDB.DocumentClient.PutItemInput = {
-      TableName: this.table,
-      Item: item,
-    }
-    return new chain.Put(
-      this.fields,
-      this.client,
-      this.table,
-      this.keyFields,
-      params
+  public batchPut = (...items: ScItem<T>[]) =>
+    new chain.BatchPut(this.config({ items }))
+
+  public delete = (...key: KeyValue<T, F>) =>
+    new chain.Delete(
+      this.config({
+        return: 'NONE',
+        key: this.buildKey(...key),
+      })
     )
-  }
 
-  public batchPut(...items: Item<F, T[typeof DDBKey]>[]): chain.BatchPut<T, F> {
-    return new chain.BatchPut(this.schema, this.client, this.table, items)
-  }
-
-  public delete(...key: KeyValue<T, F>): chain.Delete<F, 'NONE'> {
-    const params: AWS.DynamoDB.DocumentClient.DeleteItemInput = {
-      TableName: this.table,
-      Key: this.buildKey(...key),
-    }
-    return new chain.Delete(this.fields, this.client, params, 'NONE')
-  }
-
-  public batchDelete(...keys: FlatKeyValue<T, F>[]): chain.BatchDelete<T> {
-    return new chain.BatchDelete(
-      this.schema,
-      this.client,
-      this.table,
-      keys.map(key =>
-        this.buildKey(...((Array.isArray(key) ? key : [key]) as KeyValue<T, F>))
-      )
+  public batchDelete = (...keys: FlatKeyValue<T, F>[]) =>
+    new chain.BatchDelete(
+      this.config({
+        keys: keys.map(key =>
+          this.buildKey(
+            ...((Array.isArray(key) ? key : [key]) as KeyValue<T, F>)
+          )
+        ),
+      })
     )
-  }
 
   public update<U extends ItemUpdate<T, F>>(
     key: FlatKeyValue<T, F>,
     update?: U
-  ): chain.Update<T, 'NONE', F> {
+  ): chain.Update<T, 'NONE'> {
     const remove: string[] = (update as any)?.$remove
     delete (update as any)?.$remove
     const add = (update as any)?.$add
@@ -119,28 +109,25 @@ export class DDB<
     const del = (update as any)?.$delete
     delete (update as any)?.$delete
 
-    return new (chain.Update as any)(this.fields, this.client, {
-      table: this.table,
-      key: this.buildKey(
-        ...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>)
-      ),
-      set: update,
-      remove,
-      add,
-      delete: del,
-    })
+    // FIXME: type instantiation
+    return new (chain.Update as any)(
+      this.config({
+        return: 'NONE',
+        key: this.buildKey(
+          ...((typeof key === 'string' ? [key] : key) as KeyValue<T, F>)
+        ),
+        update: { set: update, remove, add, delete: del },
+      })
+    )
   }
 
-  public scan(): chain.Scan<F> {
-    return new chain.Scan(this.fields, this.client, this.table)
-  }
+  public scan = () => new chain.Scan(this.config({}))
 
-  public query(partitionKey: KeyValue<T, F>[0]): chain.Query<T, F> {
-    return new chain.Query(this.schema, this.client, this.table, partitionKey)
-  }
+  public query = (partitionKey: KeyValue<T, F>[0]) =>
+    new chain.Query(this.config({ key: partitionKey }))
 
   public async truncate() {
-    const items = await this.scan().select(...this.keyFields)
+    const items: any[] = await this.scan().select(...this.keyFields)
     await this.batchDelete(...items.map(this.keyValue))
   }
 
@@ -154,8 +141,8 @@ export class DDB<
     return Object.fromEntries(this.keyFields.map((k, i) => [k, v[i]]))
   }
 
-  private keyValue(obj: DBItem<F>): FlatKeyValue<T, F> {
-    const [h, s] = this.keyFields.map(k => obj[k])
+  private keyValue(obj: ScItem<T>): FlatKeyValue<T, F> {
+    const [h, s] = this.keyFields.map(k => (obj as any)[k])
     return s !== undefined ? [h, s] : h
   }
 }

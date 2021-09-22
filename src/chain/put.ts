@@ -1,84 +1,61 @@
+import type { Config } from './base'
 import ConditionChain from './condition'
 import { decode } from '../utils/convert'
 import { assert, ReturnValueError } from '../utils/error'
 import { oneOf } from '../utils/array'
 import * as expr from '../expression'
-import type { Fields, DBItem } from '../types'
+import type { Schema, ScItem } from '../types'
 
 type ReturnType = 'NONE' | 'NEW' | 'OLD'
 
+type PutConfig<T extends Schema<any>, R extends ReturnType> = Config<T> & {
+  return: R
+  item: ScItem<T>
+}
+
 export class Put<
-  T extends Fields,
-  R extends ReturnType,
-  F = R extends 'NONE' ? undefined : DBItem<T>
-> extends ConditionChain<F, T> {
-  constructor(
-    fields: T,
-    client: AWS.DynamoDB.DocumentClient,
-    table: string,
-    private readonly keyFields: string[],
-    private readonly params: AWS.DynamoDB.DocumentClient.PutItemInput,
-    private readonly returnType: ReturnType = 'NONE',
-    debug?: boolean
-  ) {
-    super(fields, client, table, debug)
+  T extends Schema<any>,
+  R extends ReturnType
+> extends ConditionChain<
+  R extends 'NONE' ? undefined : ScItem<T>,
+  PutConfig<T, R>,
+  { cast: true }
+> {
+  constructor(config: PutConfig<T, R>) {
+    super(config, { cast: true })
   }
 
   async execute() {
-    this.params.Item = this.makeSets(this.params.Item)
-
-    const params = {
-      ...this.params,
-      ...(this.returnType === 'OLD' && {
-        ReturnValues: 'ALL_OLD',
-      }),
+    const params: AWS.DynamoDB.DocumentClient.PutItemInput = {
+      TableName: this.config.table,
+      Item: this.makeSets(this.config.item),
+      ...(this.config.return === 'OLD' && { ReturnValues: 'ALL_OLD' }),
     }
+
     Object.assign(params, expr.merge(params as any, this.buildCondition()))
     super.log('put', params)
 
-    const { Attributes } = await this.client.put(params).promise()
+    const { Attributes } = await this.config.client.put(params).promise()
 
-    const result: F = decode(
-      this.returnType === 'NEW'
-        ? this.params.Item
-        : this.returnType === 'OLD'
+    const result = decode(
+      this.config.return === 'NEW'
+        ? params.Item
+        : this.config.return === 'OLD'
         ? Attributes
         : undefined
-    ) as any
-
-    this.resolve(result)
+    )
+    this.resolve(result as any)
   }
 
   returning<R extends ReturnType>(v: R): Put<T, R> {
     assert(oneOf(v, 'NEW', 'OLD', 'NONE'), new ReturnValueError(v, 'insert'))
-    return this.clone(this.fields, this._debug, v)
+    return this.clone({ return: v as any }) as any
   }
 
   public ifNotExists() {
     let chain = this
     for (const k of this.keyFields)
-      chain = chain.if(k, '<>', this.params.Item[k]) as any
-    return chain
-  }
-
-  public cast = super._cast.bind(this)
-
-  protected clone(
-    fields = this.fields,
-    debug = this._debug,
-    returnType = this.returnType
-  ) {
-    const chain = new Put(
-      fields,
-      this.client,
-      this.table,
-      this.keyFields,
-      this.params,
-      returnType,
-      debug
-    ) as any
-    chain.condition = this.cloneConditon()
-    this.copyState(chain)
+      chain = chain.if(k, '<>', (this.config.item as any)[k]) as any
     return chain
   }
 }

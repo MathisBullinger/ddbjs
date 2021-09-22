@@ -1,65 +1,49 @@
+import type { Config } from './base'
 import ConditionChain from './condition'
 import { decode } from '../utils/convert'
 import { assert, ReturnValueError } from '../utils/error'
 import { oneOf } from '../utils/array'
 import * as expr from '../expression'
-import type { Fields, DBItem } from '../types'
+import type { Schema, ScItem } from '../types'
 
 type ReturnType = 'NONE' | 'OLD'
 
+type DelConfig<T extends Schema<any>, R extends ReturnType> = Config<T> & {
+  return: R
+  key: any
+}
+
 export class Delete<
-  T extends Fields,
-  R extends ReturnType,
-  F = R extends 'NONE' ? undefined : DBItem<T>
-> extends ConditionChain<F, T> {
-  constructor(
-    fields: T,
-    client: AWS.DynamoDB.DocumentClient,
-    private readonly params: AWS.DynamoDB.DocumentClient.DeleteItemInput,
-    private readonly returnType: ReturnType = 'NONE',
-    debug?: boolean
-  ) {
-    super(fields, client, params.TableName, debug)
+  T extends Schema<any>,
+  R extends ReturnType
+> extends ConditionChain<
+  R extends 'NONE' ? undefined : ScItem<T>,
+  DelConfig<T, R>,
+  {}
+> {
+  constructor(config: DelConfig<T, R>) {
+    super(config, {})
   }
 
   async execute() {
     const params: AWS.DynamoDB.DeleteItemInput = {
-      ...this.params,
-      ...(this.returnType === 'OLD' && {
+      TableName: this.config.table,
+      Key: this.config.key,
+      ...(this.config.return === 'OLD' && {
         ReturnValues: 'ALL_OLD',
       }),
     }
     Object.assign(params, expr.merge(params as any, this.buildCondition()))
     super.log('delete', params)
 
-    const { Attributes } = await this.client.delete(params).promise()
+    const { Attributes } = await this.config.client.delete(params).promise()
 
-    const result: F = decode(
-      this.returnType === 'OLD' ? Attributes : undefined
-    ) as any
-
-    this.resolve(result)
+    const result = decode(this.config.return === 'OLD' ? Attributes : undefined)
+    this.resolve(result as any)
   }
 
   returning<R extends ReturnType>(v: R): Delete<T, R> {
     assert(oneOf(v, 'NONE', 'OLD'), new ReturnValueError(v, 'delete'))
-    return this.clone(this.fields, this._debug, v)
-  }
-
-  protected clone(
-    fields = this.fields,
-    debug = this._debug,
-    returnType = this.returnType
-  ) {
-    const chain = new Delete(
-      fields,
-      this.client,
-      this.params,
-      returnType,
-      debug
-    ) as any
-    chain.condition = this.cloneConditon()
-    this.copyState(chain)
-    return chain
+    return this.clone({ return: v as any }) as any
   }
 }

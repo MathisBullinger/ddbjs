@@ -1,12 +1,24 @@
-import type { Fields, ExplTypes, KeySym } from '../types'
-import BiMap from 'snatchblock/bimap'
+import type { Schema, ExplTypes, KeySym, ScFields } from '../types'
 import { clone } from '../utils/object'
 import * as naming from '../utils/naming'
+import BiMap from 'snatchblock/bimap'
+import callAll from 'snatchblock/callAll'
+
+export type Config<T extends Schema<any>> = {
+  schema: T
+  client: AWS.DynamoDB.DocumentClient
+  table: string
+  strong?: boolean
+  debug?: boolean
+}
+
+export type UtilFlags = { cast?: boolean }
 
 export default abstract class BaseChain<
-  T,
-  F extends Fields
-> extends Promise<T> {
+  TResult,
+  TConfig extends Config<any>,
+  TUtil extends UtilFlags = {}
+> extends Promise<TResult> {
   static get [Symbol.species]() {
     return Promise
   }
@@ -15,10 +27,8 @@ export default abstract class BaseChain<
 
   // @ts-ignore
   constructor(
-    readonly fields: F,
-    protected readonly client: AWS.DynamoDB.DocumentClient,
-    protected readonly table: string,
-    protected _debug = false
+    protected readonly config: TConfig,
+    private readonly utils: TUtil
   ) {
     let _resolve: any
     let _reject: any
@@ -28,13 +38,20 @@ export default abstract class BaseChain<
     })
     this.resolve = _resolve!
     this.reject = _reject!
+
+    for (const flag of this.flagged)
+      if (!utils[flag]) delete (this as any)[flag]
+
+    this.onCloneHooks.push(chain => {
+      this.copyState(chain)
+    })
   }
 
-  protected resolve!: (v: T | PromiseLike<T>) => void
+  protected resolve!: (v: TResult | PromiseLike<TResult>) => void
   protected reject!: (reason?: any) => void
 
-  public then<TResult1 = T, TResult2 = never>(
-    res?: (value: T) => TResult1 | PromiseLike<TResult1>,
+  public then<TResult1 = TResult, TResult2 = never>(
+    res?: (value: TResult) => TResult1 | PromiseLike<TResult1>,
     rej?: (reason: any) => TResult2 | PromiseLike<TResult2>
   ): Promise<TResult1 | TResult2> {
     this.execute().catch(this.reject)
@@ -44,11 +61,11 @@ export default abstract class BaseChain<
   protected abstract execute(): Promise<void>
 
   public debug(): this {
-    return this.clone(this.fields, true)
+    return this.clone({ debug: true } as Partial<TConfig>)
   }
 
   protected log(method: string, params?: Record<string, any>) {
-    if (this._debug) console.log(method, params ?? '')
+    if (this.config.debug) console.log(method, params ?? '')
   }
 
   protected attrNames = BiMap.alias('key', 'name')<string, string>()
@@ -70,7 +87,7 @@ export default abstract class BaseChain<
     return this.attrValues.value.getOrSet(val, `:v${this.attrValues.size}`)
   }
 
-  protected copyState(chain: BaseChain<any, any>) {
+  protected copyState(chain: BaseChain<any, any, any>) {
     chain.attrNames = this.attrNames.clone()
     chain.attrValues = this.attrValues.clone()
   }
@@ -84,7 +101,7 @@ export default abstract class BaseChain<
   } {
     return {
       ...input,
-      TableName: this.table,
+      TableName: this.config.table,
       ...(this.attrNames.size && {
         ExpressionAttributeNames: Object.fromEntries(this.attrNames.key),
       }),
@@ -94,23 +111,23 @@ export default abstract class BaseChain<
     } as any
   }
 
-  protected isSet(key: string, entry = this.fields): boolean {
+  protected isSet(key: string, entry = this.config.schema): boolean {
     const type = entry[key]
     if (!Array.isArray(type)) return false
     return type.length === 1
   }
 
-  protected makeSets(target: any, entry: any = this.fields) {
+  protected makeSets(target: any, entry: any = this.config.schema) {
     if (!target) return
     const mapped = { ...target } as any
     for (const [k, v] of Object.entries(mapped)) {
       if (
-        k in this.fields &&
+        k in this.config.schema &&
         typeof v === 'object' &&
         !Array.isArray(v) &&
         v !== null
       )
-        mapped[k] = this.makeSets(v, this.fields[k])
+        mapped[k] = this.makeSets(v, this.config.schema[k])
       else if (this.isSet(k, entry) && Array.isArray(v))
         mapped[k] = this.createSet(v)
     }
@@ -118,29 +135,54 @@ export default abstract class BaseChain<
   }
 
   protected createSet(v: any[]) {
-    return this.client.createSet(v)
+    return this.config.client.createSet(v)
   }
 
-  protected _cast(casts: ExplTypes<F>): this {
-    const fields = clone(this.fields)
+  protected onCloneHooks: ((chain: this) => void)[] = []
 
-    const apply = (
-      type: 'Set' | 'List',
-      path: string[],
-      target: any = fields
-    ) => {
-      if (path.length === 1) {
-        target[path[0]] = type === 'List' ? [] : [String]
-        return
+  private flagged: (keyof TUtil)[] = []
+  private flag<T, F extends keyof TUtil>(
+    flag: F,
+    fun: T
+  ): TUtil[F] extends true ? T : never {
+    this.flagged.push(flag)
+    return fun as any
+  }
+
+  public cast = this.flag(
+    'cast',
+    (casts: ExplTypes<ScFields<TConfig['schema']>>) => {
+      const schema = clone(this.config.schema)
+
+      const apply = (
+        type: 'Set' | 'List',
+        path: string[],
+        target: any = schema
+      ) => {
+        if (path.length > 1)
+          apply(type, path.slice(1), (target[path[0]] ??= {}))
+        else target[path[0]] = type === 'List' ? [] : [String]
       }
-      apply(type, path.slice(1), (target[path[0]] ??= {}))
+
+      for (const [path, type] of Object.entries(casts))
+        apply(type, path.split('.'))
+
+      return this.clone({ schema } as Partial<TConfig>)
     }
+  )
 
-    for (const [path, type] of Object.entries(casts))
-      apply(type, path.split('.'))
-
-    return this.clone(fields, this._debug)
+  protected clone(diff: Partial<TConfig> = {}): this {
+    const copy = new (this as any).constructor(
+      { ...this.config, ...diff },
+      this.utils
+    )
+    callAll(this.onCloneHooks, copy)
+    return copy
   }
 
-  protected abstract clone(fields?: F, debug?: boolean): this
+  protected get keyFields(): string[] {
+    return typeof this.config.schema[BaseChain.key!] === 'string'
+      ? [this.config.schema[BaseChain.key!] as string]
+      : (this.config.schema[BaseChain.key!] as string[])
+  }
 }

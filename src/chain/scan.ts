@@ -1,32 +1,33 @@
-import BaseChain from './base'
+import BaseChain, { Config } from './base'
 import { decode } from '../utils/convert'
 import * as expr from '../expression'
-import type { Fields, DBItem } from '../types'
+import type { Schema, Field, Projected, ScFields } from '../types'
 
-export class Scan<T extends Fields> extends BaseChain<DBItem<T>[], T> {
-  constructor(
-    fields: T,
-    client: AWS.DynamoDB.DocumentClient,
-    table: string,
-    private readonly _limit?: number,
-    private readonly selected?: string[],
-    debug?: boolean
-  ) {
-    super(fields, client, table, debug)
+type ScanConfig<T extends Schema<any>> = Config<T> & {
+  limit?: number
+  selection?: any[]
+}
+
+export class Scan<
+  T extends Schema<any>,
+  S extends string | number | symbol = Field<T>
+> extends BaseChain<Projected<ScFields<T>, S>[], ScanConfig<T>> {
+  constructor(config: ScanConfig<T>) {
+    super(config, {})
   }
 
   async execute() {
     const params: AWS.DynamoDB.ScanInput = {
-      TableName: this.table,
-      Limit: this._limit,
+      TableName: this.config.table,
+      Limit: this.config.limit,
     }
-    Object.assign(params, expr.project(...(this.selected ?? [])))
+    Object.assign(params, expr.project(...(this.config.selection ?? [])))
 
     const items: any[] = []
 
     do {
       super.log('scan', params)
-      const { Items, LastEvaluatedKey } = await this.client
+      const { Items, LastEvaluatedKey } = await this.config.client
         .scan(params)
         .promise()
       items.push(...(Items ?? []))
@@ -37,27 +38,11 @@ export class Scan<T extends Fields> extends BaseChain<DBItem<T>[], T> {
     this.resolve(items.map(decode) as any)
   }
 
-  public limit(n: number): this {
-    return this.clone(this.fields, this._debug, n)
+  public limit(limit: number) {
+    return this.clone({ limit })
   }
 
-  public select(...fields: string[]): this {
-    return this.clone(this.fields, this._debug, this._limit, fields)
-  }
-
-  protected clone(
-    fields = this.fields,
-    debug = this._debug,
-    limit = this._limit,
-    selected = this.selected
-  ): this {
-    return new Scan(
-      fields,
-      this.client,
-      this.table,
-      limit,
-      selected,
-      debug
-    ) as any
+  public select<Fields extends string>(...fields: Fields[]): Scan<T, Fields> {
+    return this.clone({ selection: fields }) as any
   }
 }

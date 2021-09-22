@@ -1,9 +1,16 @@
 import { DDBKey } from './ddb'
 export type KeySym = typeof DDBKey
 
-export type Schema<T extends Fields> = T & Readonly<{ [DDBKey]: Key<T> }>
+export type Schema<T extends Fields> = T & { [DDBKey]: Key<T> }
+export type Fields = Record<string, SchemaValueType>
 
-export type Fields = Readonly<Record<string, SchemaValueType>>
+export type ScFields<T extends Schema<any>> = T extends Schema<infer F>
+  ? F
+  : never
+export type Field<T extends Schema<any>> = keyof ScFields<T>
+export type ScItem<T extends Schema<any>> = T extends Schema<infer F>
+  ? Item<F, T[KeySym]>
+  : never
 
 export type PrimitiveConstructor =
   | StringConstructor
@@ -62,17 +69,19 @@ export type KeyFields<T extends Fields, K extends Key<T>> = keyof Pick<
   K extends CompositeKey<T> ? K[0] | K[1] : K
 >
 
-export type Item<TFields extends Fields, TKey extends Key<TFields>> = {
-  [K in KeyFields<TFields, TKey>]: SchemaValue<TFields[K]>
-} &
+export type Item<F extends Fields, R extends Key<F>> = PickRequired<
   {
-    [K in keyof Omit<TFields, KeyFields<TFields, TKey>>]?: SchemaValue<
-      TFields[K]
-    >
-  }
+    [K in keyof F]: SchemaValue<F[K]>
+  },
+  KeyFields<F, R>
+>
 
-export type DBItem<T extends Fields> = { [K in keyof T]: SchemaValue<T[K]> } &
-  Record<string, any>
+type PickRequired<T, K extends keyof T> = { [R in K]-?: T[R] } &
+  { [O in Exclude<keyof T, K>]?: T[O] }
+
+export type Projected<T extends Fields, S extends string | number | symbol> = {
+  [K in S]: K extends keyof T ? SchemaValue<T[K]> : unknown
+}
 
 export type UpdateInput<
   T extends Schema<F>,

@@ -1,106 +1,106 @@
-import BaseChain from './base'
+import type { Config } from './base'
 import ConditionChain from './condition'
 import * as expr from '../expression'
 import { decode } from '../utils/convert'
-import type { Fields, Schema, DBItem, UpdateInput, KeySym } from '../types'
-import { mapValues } from '../utils/object'
+import type { Schema, UpdateInput, ScItem } from '../types'
+import { mapValues, clone } from '../utils/object'
 
 type ReturnType = 'NONE' | 'OLD' | 'NEW' | 'UPDATED_OLD' | 'UPDATED_NEW'
 
-type UpdateOpts = {
-  table: string
+type UpdateConfig<T extends Schema<any>, R extends ReturnType> = Config<T> & {
+  return: R
   key: any
+  update: Input<T>
 }
+type Input<T extends Schema<any>> = T extends Schema<infer F>
+  ? UpdateInput<T, F>
+  : never
 
 export class Update<
-  T extends Schema<F>,
-  RT extends ReturnType,
-  F extends Fields = Omit<T, KeySym>,
-  RV = RT extends 'NONE'
+  T extends Schema<any>,
+  R extends ReturnType
+> extends ConditionChain<
+  R extends 'NONE'
     ? undefined
-    : RT extends 'OLD' | 'NEW'
-    ? DBItem<F>
-    : Partial<DBItem<F>>
-> extends ConditionChain<RV, F> {
-  constructor(
-    fields: F,
-    client: AWS.DynamoDB.DocumentClient,
-    private readonly update: UpdateInput<T, F> & UpdateOpts,
-    private readonly returnType: ReturnType = 'NONE',
-    debug?: boolean
-  ) {
-    super(fields, client, update.table, debug)
+    : R extends 'OLD' | 'NEW'
+    ? ScItem<T>
+    : Partial<ScItem<T>>,
+  UpdateConfig<T, R>,
+  { cast: true }
+> {
+  constructor(config: UpdateConfig<T, R>) {
+    super(config, { cast: true })
   }
 
   async execute() {
     const params: Partial<AWS.DynamoDB.DocumentClient.UpdateItemInput> = {
-      TableName: this.update.table,
-      Key: this.update.key,
+      TableName: this.config.table,
+      Key: this.config.key,
     }
 
-    this.update.set = this.makeSets(this.update.set)
+    this.config.update.set = this.makeSets(this.config.update.set)
 
     Object.assign(
       params,
       expr.merge(
-        expr.set(this.update.set as any),
-        expr.remove(...(this.update.remove ?? [])),
+        expr.set(this.config.update.set as any),
+        expr.remove(...(this.config.update.remove ?? [])),
         expr.add(
-          this.update.add &&
-            mapValues(this.update.add, v =>
-              Array.isArray(v) ? this.client.createSet(v) : v
+          this.config.update.add &&
+            mapValues(this.config.update.add, v =>
+              Array.isArray(v) ? this.config.client.createSet(v) : v
             )
         ),
         expr.del(
-          this.update.delete &&
-            mapValues(this.update.delete, v => this.client.createSet(v))
+          this.config.update.delete &&
+            mapValues(this.config.update.delete, v =>
+              this.config.client.createSet(v)
+            )
         )
       )
     )
 
-    params.ReturnValues = ['NEW', 'OLD'].includes(this.returnType)
-      ? `ALL_${this.returnType}`
-      : this.returnType
+    params.ReturnValues = ['NEW', 'OLD'].includes(this.config.return)
+      ? `ALL_${this.config.return}`
+      : this.config.return
 
     Object.assign(params, expr.merge(params as any, this.buildCondition()))
 
     if (!this.isComplete(params)) throw Error('incomplete update')
 
     super.log('update', params)
-    const { Attributes } = await this.client.update(params).promise()
-    const result: RV = decode(
-      this.returnType === 'NONE' ? undefined : Attributes
-    ) as any
-    this.resolve(result)
+    const { Attributes } = await this.config.client.update(params).promise()
+    const result = decode(
+      this.config.return === 'NONE' ? undefined : Attributes
+    )
+    this.resolve(result as any)
   }
 
-  remove(...fields: string[]): Update<T, RT, F, RV> {
-    const update = this.update
-    update.remove = [...(update.remove ?? []), ...fields]
-    return this.clone(this.fields, this._debug, update)
+  remove(...fields: string[]) {
+    const update = clone(this.config.update)
+    ;(update.remove ??= []).push(...fields)
+    return this.clone({ update })
   }
 
-  add(fields: Exclude<UpdateInput<T, F>['add'], null>): Update<T, RT, F, RV> {
-    const update = this.update
+  add(fields: Exclude<Input<T>['add'], null>) {
+    const update = clone(this.config.update)
     update.add = { ...update.add, ...fields }
-    return this.clone(this.fields, this._debug, update)
+    return this.clone({ update })
   }
 
-  delete(
-    fields: Exclude<UpdateInput<T, F>['delete'], null>
-  ): Update<T, RT, F, RV> {
-    const update = this.update
+  delete(fields: Exclude<Input<T>['delete'], null>) {
+    const update = clone(this.config.update)
     update.delete = { ...update.delete, ...fields }
-    return this.clone(this.fields, this._debug, update)
+    return this.clone({ update })
   }
 
-  returning<R extends ReturnType>(v: R): Update<T, R, F> {
-    return this.clone(this.fields, this._debug, this.update, v)
+  returning<R extends ReturnType>(v: R): Update<T, R> {
+    return this.clone({ return: v as any }) as any
   }
 
   ifExists() {
     let chain = this
-    for (const [k, v] of Object.entries(this.update.key))
+    for (const [k, v] of Object.entries(this.config.key))
       chain = chain.if(k, '=', { literal: v as any }) as any
     return chain
   }
@@ -111,25 +111,5 @@ export class Update<
     if (!input.UpdateExpression?.length)
       throw Error('missing update expression')
     return true
-  }
-
-  public cast = super._cast.bind(this)
-
-  protected clone(
-    fields = this.fields,
-    debug = this._debug,
-    update = this.update,
-    returnType = this.returnType
-  ) {
-    const chain = new (Update as any)(
-      fields,
-      this.client,
-      update,
-      returnType,
-      debug
-    ) as any
-    chain.condition = this.cloneConditon()
-    this.copyState(chain)
-    return chain
   }
 }
