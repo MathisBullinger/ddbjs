@@ -1,5 +1,6 @@
 import { ranId, db, dbComp, scanDB, scanDBComp } from './utils/db'
 import type { DBRecord } from '../src/ddb'
+import pick from 'snatchblock/pick'
 
 jest.setTimeout(20000)
 
@@ -839,7 +840,7 @@ test('query', async () => {
   {
     const id = ranId()
     await db.put({ id })
-    await expect(db.query(id)).resolves.toEqual([{ id }])
+    await expect(db.query(id)).resolves.toMatchObject({ items: [{ id }] })
   }
 
   {
@@ -847,33 +848,64 @@ test('query', async () => {
     const sks = ['a', 'b', 'foo', 'bar']
     await dbComp.batchPut(...sks.map(sk => ({ pk, sk })))
 
-    await expect(dbComp.query(pk)).resolves.toHaveLength(sks.length)
+    const expectLength = async (prom: any, length: number) => {
+      const { items } = await prom
+      expect(items.length).toBe(length)
+    }
 
-    await expect(dbComp.query(pk).where('=', 'foo')).resolves.toHaveLength(1)
-    await expect(dbComp.query(pk).where['=']('foo')).resolves.toHaveLength(1)
+    await expectLength(dbComp.query(pk), sks.length)
 
-    await expect(dbComp.query(pk).where('<', 'c')).resolves.toHaveLength(3)
-    await expect(dbComp.query(pk).where['<']('c')).resolves.toHaveLength(3)
+    await expectLength(dbComp.query(pk).where('=', 'foo'), 1)
+    await expectLength(dbComp.query(pk).where['=']('foo'), 1)
 
-    await expect(dbComp.query(pk).where('>=', 'b')).resolves.toHaveLength(3)
-    await expect(dbComp.query(pk).where['>=']('b')).resolves.toHaveLength(3)
+    await expectLength(dbComp.query(pk).where('<', 'c'), 3)
+    await expectLength(dbComp.query(pk).where['<']('c'), 3)
 
-    await expect(
-      dbComp.query(pk).where('begins_with', 'b')
-    ).resolves.toHaveLength(2)
-    await expect(dbComp.query(pk).where.beginsWith('b')).resolves.toHaveLength(
-      2
-    )
+    await expectLength(dbComp.query(pk).where('>=', 'b'), 3)
+    await expectLength(dbComp.query(pk).where['>=']('b'), 3)
 
-    await expect(
-      dbComp.query(pk).where('between', 'c', 'z')
-    ).resolves.toHaveLength(1)
-    await expect(
-      dbComp.query(pk).where.between('c', 'z')
-    ).resolves.toHaveLength(1)
+    await expectLength(dbComp.query(pk).where('begins_with', 'b'), 2)
+    await expectLength(dbComp.query(pk).where.beginsWith('b'), 2)
 
-    const [item] = await dbComp.query(pk).select('sk')
+    await expectLength(dbComp.query(pk).where('between', 'c', 'z'), 1)
+    await expectLength(dbComp.query(pk).where.between('c', 'z'), 1)
+
+    const {
+      items: [item],
+    } = await dbComp.query(pk).select('sk')
     expect(Object.keys(item)).toEqual(['sk'])
+  }
+})
+
+test('query exceed size limit', async () => {
+  const kb50 = 'a'.repeat(50 * 2 ** 10)
+  const pk = ranId()
+
+  const items = Array(100)
+    .fill(0)
+    .map((_, i) => ({ pk, sk: i.toString(36), kb50 }))
+
+  await dbComp.batchPut(...items)
+
+  {
+    const { items, ...rest } = await dbComp.query(pk).limit(5)
+    expect(items.length).toBe(5)
+    expect(rest).toEqual({
+      count: 5,
+      scannedCount: 5,
+      lastKey: pick(items[4], 'pk', 'sk'),
+      requests: 1,
+    })
+  }
+
+  {
+    const { requests } = await dbComp.query(pk).maxRequests(2)
+    expect(requests).toBe(2)
+  }
+
+  {
+    const { items, ...rest } = await dbComp.query(pk)
+    expect(items.length).toBe(items.length)
   }
 })
 

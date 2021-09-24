@@ -1,9 +1,10 @@
 import type { Schema, ExplTypes, KeySym, ScFields } from '../types'
 import { clone } from '../utils/object'
 import * as naming from '../utils/naming'
+import { decode } from '../utils/convert'
 import BiMap from 'snatchblock/bimap'
 import callAll from 'snatchblock/callAll'
-import { decode } from '../utils/convert'
+import pick from 'snatchblock/pick'
 
 export type Config<T extends Schema<any>> = {
   schema: T
@@ -12,6 +13,8 @@ export type Config<T extends Schema<any>> = {
   strong?: boolean
   debug?: boolean
   limit?: number
+  selection?: any[]
+  maxRequests?: number
 }
 
 export type UtilFlags = { cast?: boolean; limit?: boolean }
@@ -41,8 +44,8 @@ export default abstract class BaseChain<
     this.resolve = _resolve!
     this.reject = _reject!
 
-    for (const flag of this.flagged)
-      if (!utils[flag]) delete (this as any)[flag]
+    for (const [flag, key] of this.flagged)
+      if (!utils[flag]) delete (this as any)[key]
 
     this.onCloneHooks.push(chain => {
       this.copyState(chain)
@@ -142,12 +145,13 @@ export default abstract class BaseChain<
 
   protected onCloneHooks: ((chain: this) => void)[] = []
 
-  private flagged: (keyof TUtil)[] = []
+  private flagged: [keyof TUtil, string][] = []
   private flag<T, F extends keyof TUtil>(
     flag: F,
-    fun: T
+    fun: T,
+    key = flag as string
   ): TUtil[F] extends true ? T : never {
-    this.flagged.push(flag)
+    this.flagged.push([flag, key])
     return fun as any
   }
 
@@ -175,6 +179,12 @@ export default abstract class BaseChain<
 
   public limit = this.flag('limit', (limit: number) =>
     this.clone({ limit } as Partial<TConfig>)
+  )
+
+  public maxRequests = this.flag(
+    'limit',
+    (max: number) => this.clone({ maxRequests: max } as Partial<TConfig>),
+    'maxRequests'
   )
 
   protected clone(diff: Partial<TConfig> = {}): this {
@@ -206,18 +216,35 @@ export default abstract class BaseChain<
     op: T,
     params: Parameters<AWS.DynamoDB.DocumentClient[T]>[0]
   ) {
-    const items: any[] = []
+    const result = {
+      items: Array<any>(),
+      count: 0,
+      scannedCount: 0,
+      lastKey: null as unknown,
+      requests: 0,
+    }
+
     do {
       this.log(`[batch] ${op}`, params)
-      const { Items, LastEvaluatedKey } = await this.config.client[op](
-        params
-      ).promise()
+      const res = await this.config.client[op](params).promise()
 
-      items.push(...(Items ?? []))
-      params.ExclusiveStartKey = LastEvaluatedKey
-      if (params.Limit) params.Limit -= Items?.length ?? 0
-    } while (params.ExclusiveStartKey && (params.Limit ?? Infinity) > 0)
+      result.items.push(...(res.Items ?? []))
+      result.lastKey = res.LastEvaluatedKey
+      result.count += res.Count!
+      result.scannedCount += res.ScannedCount!
+      result.requests += 1
 
-    return items.map(decode) as any[]
+      params.ExclusiveStartKey = res.LastEvaluatedKey
+      if (params.Limit) params.Limit -= res.Items?.length ?? 0
+    } while (
+      params.ExclusiveStartKey &&
+      (params.Limit ?? Infinity) > 0 &&
+      result.requests < (this.config.maxRequests ?? Infinity)
+    )
+
+    result.items = result.items.map(decode)
+    if (this.config.selection)
+      result.items = result.items.map(v => pick(v, ...this.config.selection!))
+    return result
   }
 }

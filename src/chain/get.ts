@@ -6,7 +6,6 @@ import type { ScFields, Schema, Field, Projected } from '../types'
 type GetCon<T extends Schema<any>> = Config<T> & {
   key: any
   consistent?: boolean
-  selection?: any[]
 }
 
 export class Get<

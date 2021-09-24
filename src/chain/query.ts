@@ -1,5 +1,4 @@
 import BaseChain, { Config } from './base'
-import { decode } from '../utils/convert'
 import { camel } from 'snatchblock/string'
 import type { Slice, CamelCase } from 'snatchblock/types'
 import type { Schema, KeySym, Projected, ScFields, Field } from '../types'
@@ -7,7 +6,14 @@ import type { Schema, KeySym, Projected, ScFields, Field } from '../types'
 type QueryConfig<T extends Schema<any>> = Config<T> & {
   key: any
   keyFilter?: KeyFilterArgs
-  selection?: any[]
+}
+
+type QueryResult<T> = {
+  items: T[]
+  lastKey?: unknown
+  count: number
+  scannedCount: number
+  requests: number
 }
 
 export class Query<
@@ -18,11 +24,7 @@ export class Query<
       ? true
       : false
     : false
-> extends BaseChain<
-  Projected<ScFields<T>, S>[],
-  QueryConfig<T>,
-  { limit: true }
-> {
+> extends BaseChain<QueryResult<ScFields<T>>, QueryConfig<T>, { limit: true }> {
   constructor(config: QueryConfig<T>) {
     super(config, { limit: true })
   }
@@ -52,8 +54,8 @@ export class Query<
       ...(this.config.limit !== undefined && { Limit: this.config.limit }),
     })
 
-    const items = await this.batchExec('query', params)
-    this.resolve(items)
+    const res = await this.batchExec('query', params)
+    this.resolve(res)
   }
 
   public where: SKF extends false

@@ -2,19 +2,11 @@ import BaseChain, { Config } from './base'
 import * as expr from '../expression'
 import type { Schema, Field, Projected, ScFields } from '../types'
 
-type ScanConfig<T extends Schema<any>> = Config<T> & {
-  selection?: any[]
-}
-
 export class Scan<
   T extends Schema<any>,
   S extends string | number | symbol = Field<T>
-> extends BaseChain<
-  Projected<ScFields<T>, S>[],
-  ScanConfig<T>,
-  { limit: true }
-> {
-  constructor(config: ScanConfig<T>) {
+> extends BaseChain<Projected<ScFields<T>, S>[], Config<T>, { limit: true }> {
+  constructor(config: Config<T>) {
     super(config, { limit: true })
   }
 
@@ -24,7 +16,8 @@ export class Scan<
       Limit: this.config.limit,
     }
     Object.assign(params, expr.project(...(this.config.selection ?? [])))
-    this.resolve(await this.batchExec('scan', params))
+    const { items } = await this.batchExec('scan', params)
+    this.resolve(items)
   }
 
   public select<Fields extends string>(...fields: Fields[]): Scan<T, Fields> {

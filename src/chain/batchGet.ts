@@ -7,7 +7,6 @@ import type { Schema, Fields, ScFields, Projected, Field } from '../types'
 type BatchGetConfig<T extends Schema<any>> = Config<T> & {
   keys: any[]
   sort?: boolean
-  selection?: any[]
   removeFields?: any[]
 }
 
