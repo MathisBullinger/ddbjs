@@ -18,9 +18,13 @@ export class Query<
       ? true
       : false
     : false
-> extends BaseChain<Projected<ScFields<T>, S>[], QueryConfig<T>> {
+> extends BaseChain<
+  Projected<ScFields<T>, S>[],
+  QueryConfig<T>,
+  { limit: true }
+> {
   constructor(config: QueryConfig<T>) {
-    super(config, { select: true })
+    super(config, { limit: true })
   }
 
   async execute() {
@@ -43,11 +47,13 @@ export class Query<
       KeyConditionExpression += ` AND ${cond}`
     }
 
-    const params = this.createInput({ KeyConditionExpression })
-    super.log('query', params)
+    const params: AWS.DynamoDB.QueryInput = this.createInput({
+      KeyConditionExpression,
+      ...(this.config.limit !== undefined && { Limit: this.config.limit }),
+    })
 
-    const res = await this.config.client.query(params).promise()
-    this.resolve(res.Items?.map(decode) as any)
+    const items = await this.batchExec('query', params)
+    this.resolve(items)
   }
 
   public where: SKF extends false

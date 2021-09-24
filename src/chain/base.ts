@@ -3,6 +3,7 @@ import { clone } from '../utils/object'
 import * as naming from '../utils/naming'
 import BiMap from 'snatchblock/bimap'
 import callAll from 'snatchblock/callAll'
+import { decode } from '../utils/convert'
 
 export type Config<T extends Schema<any>> = {
   schema: T
@@ -10,9 +11,10 @@ export type Config<T extends Schema<any>> = {
   table: string
   strong?: boolean
   debug?: boolean
+  limit?: number
 }
 
-export type UtilFlags = { cast?: boolean }
+export type UtilFlags = { cast?: boolean; limit?: boolean }
 
 export default abstract class BaseChain<
   TResult,
@@ -171,6 +173,10 @@ export default abstract class BaseChain<
     }
   )
 
+  public limit = this.flag('limit', (limit: number) =>
+    this.clone({ limit } as Partial<TConfig>)
+  )
+
   protected clone(diff: Partial<TConfig> = {}): this {
     const copy = new (this as any).constructor(
       { ...this.config, ...diff },
@@ -194,5 +200,24 @@ export default abstract class BaseChain<
   protected get sk(): string | null {
     const key = (this.config.schema as any)[BaseChain.key!]
     return key[1] ?? null
+  }
+
+  protected async batchExec<T extends 'scan' | 'query'>(
+    op: T,
+    params: Parameters<AWS.DynamoDB.DocumentClient[T]>[0]
+  ) {
+    const items: any[] = []
+    do {
+      this.log(`[batch] ${op}`, params)
+      const { Items, LastEvaluatedKey } = await this.config.client[op](
+        params
+      ).promise()
+
+      items.push(...(Items ?? []))
+      params.ExclusiveStartKey = LastEvaluatedKey
+      if (params.Limit) params.Limit -= Items?.length ?? 0
+    } while (params.ExclusiveStartKey && (params.Limit ?? Infinity) > 0)
+
+    return items.map(decode) as any[]
   }
 }
