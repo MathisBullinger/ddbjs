@@ -11,13 +11,19 @@ export class Scan<
   }
 
   async execute() {
-    const params: AWS.DynamoDB.ScanInput = {
+    const { items } = await this.batchExec('scan')
+    this.resolve(items)
+  }
+
+  [Symbol.asyncIterator] = this.batchIter<ScFields<T>>('scan')
+
+  protected params(): AWS.DynamoDB.ScanInput {
+    const params = {
       TableName: this.config.table,
       Limit: this.config.limit,
     }
     Object.assign(params, expr.project(...(this.config.selection ?? [])))
-    const { items } = await this.batchExec('scan', params)
-    this.resolve(items)
+    return params
   }
 
   public select<Fields extends string>(...fields: Fields[]): Scan<T, Fields> {

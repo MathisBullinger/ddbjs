@@ -13,7 +13,7 @@ type QueryResult<T> = {
   lastKey?: unknown
   count: number
   scannedCount: number
-  requests: number
+  requestCount: number
 }
 
 export class Query<
@@ -30,6 +30,12 @@ export class Query<
   }
 
   async execute() {
+    this.resolve(await this.batchExec('query'))
+  }
+
+  [Symbol.asyncIterator] = this.batchIter<ScFields<T>>('query')
+
+  protected params(): AWS.DynamoDB.QueryInput {
     let KeyConditionExpression = `${this.name(this.pk)}=${this.value(
       this.config.key
     )}`
@@ -49,13 +55,10 @@ export class Query<
       KeyConditionExpression += ` AND ${cond}`
     }
 
-    const params: AWS.DynamoDB.QueryInput = this.createInput({
+    return this.createInput({
       KeyConditionExpression,
       ...(this.config.limit !== undefined && { Limit: this.config.limit }),
     })
-
-    const res = await this.batchExec('query', params)
-    this.resolve(res)
   }
 
   public where: SKF extends false

@@ -1,5 +1,5 @@
 import { ranId, db, dbComp, scanDB, scanDBComp } from './utils/db'
-import type { DBRecord } from '../src/ddb'
+import { DBRecord } from '../src/ddb'
 import pick from 'snatchblock/pick'
 
 jest.setTimeout(20000)
@@ -877,7 +877,7 @@ test('query', async () => {
   }
 })
 
-test('query exceed size limit', async () => {
+test('query pagination & iteration', async () => {
   const kb50 = 'a'.repeat(50 * 2 ** 10)
   const pk = ranId()
 
@@ -894,18 +894,53 @@ test('query exceed size limit', async () => {
       count: 5,
       scannedCount: 5,
       lastKey: pick(items[4], 'pk', 'sk'),
-      requests: 1,
+      requestCount: 1,
     })
   }
 
   {
-    const { requests } = await dbComp.query(pk).maxRequests(2)
-    expect(requests).toBe(2)
+    const { requestCount } = await dbComp.query(pk).maxRequests(2)
+    expect(requestCount).toBe(2)
   }
 
   {
-    const { items, ...rest } = await dbComp.query(pk)
+    const { items } = await dbComp.query(pk)
     expect(items.length).toBe(items.length)
+  }
+
+  {
+    const { count, requestCount } = await dbComp
+      .query(pk)
+      .limit(50)
+      .batchSize(5)
+
+    expect(count).toBe(50)
+    expect(requestCount).toBe(10)
+  }
+
+  {
+    const results: any[] = []
+    for await (const item of dbComp.query(pk)) results.push(item)
+    expect(results.length).toBe(items.length)
+  }
+
+  {
+    const results: any[] = []
+    for await (const item of dbComp.query(pk).limit(15)) results.push(item)
+    expect(results.length).toBe(15)
+  }
+
+  {
+    const results: any[] = []
+    for await (const item of dbComp.query(pk).limit(15).batchSize(5))
+      results.push(item)
+    expect(results.length).toBe(15)
+  }
+
+  {
+    const results: any[] = []
+    for await (const item of dbComp.query(pk).maxRequests(2)) results.push(item)
+    expect(results.length).toBeLessThan(items.length)
   }
 })
 

@@ -15,6 +15,7 @@ export type Config<T extends Schema<any>> = {
   limit?: number
   selection?: any[]
   maxRequests?: number
+  batchSize?: number
 }
 
 export type UtilFlags = { cast?: boolean; limit?: boolean }
@@ -64,6 +65,7 @@ export default abstract class BaseChain<
   }
 
   protected abstract execute(): Promise<void>
+  protected params?(): any
 
   public debug(): this {
     return this.clone({ debug: true } as Partial<TConfig>)
@@ -187,6 +189,12 @@ export default abstract class BaseChain<
     'maxRequests'
   )
 
+  public batchSize = this.flag(
+    'limit',
+    (size: number) => this.clone({ batchSize: size } as Partial<TConfig>),
+    'batchSize'
+  )
+
   protected clone(diff: Partial<TConfig> = {}): this {
     const copy = new (this as any).constructor(
       { ...this.config, ...diff },
@@ -212,39 +220,58 @@ export default abstract class BaseChain<
     return key[1] ?? null
   }
 
-  protected async batchExec<T extends 'scan' | 'query'>(
-    op: T,
-    params: Parameters<AWS.DynamoDB.DocumentClient[T]>[0]
-  ) {
+  protected async batchExec<T extends 'scan' | 'query'>(op: T) {
     const result = {
       items: Array<any>(),
       count: 0,
       scannedCount: 0,
       lastKey: null as unknown,
-      requests: 0,
+      requestCount: 0,
     }
 
-    do {
-      this.log(`[batch] ${op}`, params)
-      const res = await this.config.client[op](params).promise()
+    for await (const item of this.batchIter(op)(v => {
+      result.lastKey = v.LastEvaluatedKey
+      result.count += v.Count ?? 0
+      result.scannedCount += v.ScannedCount ?? 0
+      result.requestCount += 1
+    }))
+      result.items.push(item)
 
-      result.items.push(...(res.Items ?? []))
-      result.lastKey = res.LastEvaluatedKey
-      result.count += res.Count!
-      result.scannedCount += res.ScannedCount!
-      result.requests += 1
-
-      params.ExclusiveStartKey = res.LastEvaluatedKey
-      if (params.Limit) params.Limit -= res.Items?.length ?? 0
-    } while (
-      params.ExclusiveStartKey &&
-      (params.Limit ?? Infinity) > 0 &&
-      result.requests < (this.config.maxRequests ?? Infinity)
-    )
-
-    result.items = result.items.map(decode)
-    if (this.config.selection)
-      result.items = result.items.map(v => pick(v, ...this.config.selection!))
     return result
   }
+
+  protected batchIter = <T = any>(
+    op: 'scan' | 'query',
+    getParams: () => Parameters<AWS.DynamoDB.DocumentClient['query']>[0] = () =>
+      this.params?.(),
+    config: Config<any> = this.config
+  ) =>
+    async function* (
+      onBatch?: (res: AWS.DynamoDB.DocumentClient.QueryOutput) => void
+    ): AsyncGenerator<T> {
+      const params = getParams()
+      let itemCount = 0
+      let requestCount = 0
+
+      do {
+        if (config.limit) params.Limit = config.limit - itemCount
+        if (config.batchSize! < (params.Limit ?? Infinity))
+          params.Limit = config.batchSize
+
+        const res = await config.client[op](params).promise()
+        onBatch?.(res)
+        params.ExclusiveStartKey = res.LastEvaluatedKey
+        itemCount += res.Items?.length ?? 0
+
+        for (const item of res.Items ?? []) {
+          let val: any = decode(item)
+          if (config.selection) val = pick(val, ...config.selection!)
+          yield val
+        }
+      } while (
+        params.ExclusiveStartKey &&
+        itemCount < (config.limit ?? Infinity) &&
+        ++requestCount < (config.maxRequests ?? Infinity)
+      )
+    }
 }
