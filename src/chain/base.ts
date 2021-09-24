@@ -185,4 +185,14 @@ export default abstract class BaseChain<
       ? [this.config.schema[BaseChain.key!] as string]
       : (this.config.schema[BaseChain.key!] as string[])
   }
+
+  protected get pk(): string {
+    const key = (this.config.schema as any)[BaseChain.key!]
+    return Array.isArray(key) ? key[0] : (key as any)
+  }
+
+  protected get sk(): string | null {
+    const key = (this.config.schema as any)[BaseChain.key!]
+    return key[1] ?? null
+  }
 }

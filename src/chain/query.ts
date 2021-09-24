@@ -2,23 +2,25 @@ import BaseChain, { Config } from './base'
 import { decode } from '../utils/convert'
 import { camel } from 'snatchblock/string'
 import type { Slice, CamelCase } from 'snatchblock/types'
-import type { Schema, KeySym, ScItem } from '../types'
+import type { Schema, KeySym, Projected, ScFields, Field } from '../types'
 
 type QueryConfig<T extends Schema<any>> = Config<T> & {
   key: any
   keyFilter?: KeyFilterArgs
+  selection?: any[]
 }
 
 export class Query<
   T extends Schema<any>,
+  S extends string | number | symbol = Field<T>,
   SKF extends boolean = KeySym extends keyof T
     ? T[KeySym] extends any[]
       ? true
       : false
     : false
-> extends BaseChain<ScItem<T>[], QueryConfig<T>> {
+> extends BaseChain<Projected<ScFields<T>, S>[], QueryConfig<T>> {
   constructor(config: QueryConfig<T>) {
-    super(config, {})
+    super(config, { select: true })
   }
 
   async execute() {
@@ -28,6 +30,7 @@ export class Query<
     if (this.config.keyFilter) {
       const [op, ...raw] = this.config.keyFilter
       const args = raw.map(v => this.value(v))
+      if (!this.sk) throw Error("doesn't have sk")
       const key = this.name(this.sk)
 
       let cond =
@@ -47,29 +50,25 @@ export class Query<
     this.resolve(res.Items?.map(decode) as any)
   }
 
-  public where: SKF extends false ? never : KeyFilterBuilder<Query<T, false>> =
-    ((f: any) =>
-      Object.assign(
-        f,
+  public where: SKF extends false
+    ? never
+    : KeyFilterBuilder<Query<T, S, false>> = ((f: any) =>
+    Object.assign(
+      f,
 
-        Object.fromEntries(
-          filterOps.map(op => [camel(op), (...args: any[]) => f(op, ...args)])
-        )
-      ))((...args: KeyFilterArgs) =>
-      this.clone({
-        keyFilter: [args[0].toLowerCase(), ...args.slice(1)] as KeyFilterArgs,
-      })
-    )
+      Object.fromEntries(
+        filterOps.map(op => [camel(op), (...args: any[]) => f(op, ...args)])
+      )
+    ))((...args: KeyFilterArgs) =>
+    this.clone({
+      keyFilter: [args[0].toLowerCase(), ...args.slice(1)] as KeyFilterArgs,
+    })
+  )
 
-  private get pk(): string {
-    const key = (this.config.schema as any)[BaseChain.key!]
-    return Array.isArray(key) ? key[0] : (key as any)
-  }
-
-  private get sk(): string {
-    const key = (this.config.schema as any)[BaseChain.key!]
-    if (!Array.isArray(key) || key.length < 2) throw Error("doesn't have sk")
-    return key[1] as string
+  public select<Fields extends string>(
+    ...fields: Fields[]
+  ): Query<T, Fields, SKF> {
+    return this.clone({ selection: fields }) as any
   }
 }
 

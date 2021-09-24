@@ -18,11 +18,10 @@ export class Get<
   }
 
   async execute() {
-    const params: Partial<AWS.DynamoDB.GetItemInput> = {
-      TableName: this.config.table,
+    const params = this.createInput({
       Key: this.config.key,
       ConsistentRead: this.config.consistent ?? false,
-    }
+    })
     super.log('get', params)
     Object.assign(params, expr.project(...(this.config.selection ?? [])))
     const { Item } = await this.config.client.get(params as any).promise()

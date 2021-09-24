@@ -871,6 +871,9 @@ test('query', async () => {
     await expect(
       dbComp.query(pk).where.between('c', 'z')
     ).resolves.toHaveLength(1)
+
+    const [item] = await dbComp.query(pk).select('sk')
+    expect(Object.keys(item)).toEqual(['sk'])
   }
 })
 
