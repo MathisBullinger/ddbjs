@@ -16,6 +16,7 @@ export type Config<T extends Schema<any>> = {
   selection?: any[]
   maxRequests?: number
   batchSize?: number
+  from?: any
 }
 
 export type UtilFlags = { cast?: boolean; limit?: boolean; strong?: boolean }
@@ -196,6 +197,12 @@ export default abstract class BaseChain<
     'batchSize'
   )
 
+  public from = this.flag(
+    'limit',
+    (key: any) => this.clone({ from: key } as Partial<TConfig>),
+    'from'
+  )
+
   public strong = this.flag('strong', () =>
     this.clone({ strong: true } as Partial<TConfig>)
   )
@@ -255,6 +262,7 @@ export default abstract class BaseChain<
       onBatch?: (res: AWS.DynamoDB.DocumentClient.QueryOutput) => void
     ): AsyncGenerator<T> {
       const params = getParams()
+      if (config.from) params.ExclusiveStartKey = config.from
       let itemCount = 0
       let requestCount = 0
 

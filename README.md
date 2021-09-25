@@ -138,6 +138,93 @@ await db.update(['hash', 'sort'], { data: '…' })
 
 ## `query`
 
+Finds an item based on its partition key value. For a detailed explanation see 
+the AWS DynamoDB [guide](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Query.html)
+and [reference](https://docs.aws.amazon.com/amazondynamodb/latest/APIReference/API_Query.html).
+
+Optionally, you can perform comparisons on the sort key using the `.where` 
+method. DynamoDB only supports a subset of the usual comparisons when querying
+on the sort key. Available are `=`, `<`, `<=`, `>`, `>=`, `between`, 
+and `begins_with`, and you cannot perform multiple comparisons on the sort key
+at once.
+
+```ts
+db.query('foo')
+db.query('foo').where('>', 5)
+db.query('foo').where('between', 1, 10)
+db.query('foo').where.beginsWith('prefix')
+```
+
+All search key comparisons can be written both as `where(op, ...args)` and 
+`where[op](...args)`, e.g.:
+
+```ts
+where('=', 5)
+where['='](5)
+
+where('between', 1, 10)
+where.between(1, 10)
+
+where('begins_with', 'foo')
+where.beginsWith('foo')
+```
+
+Additionally, you can filter which items are returned by performaning any number
+of comparisons on non-key attributes. Note however, that these filters are only
+applied *after* the query has completed and DynamoDB will charge you the same
+number of read capacity units as if the filter wasn't present.
+
+The syntax to apply filters is exactly the same as 
+[condition expressions](#condition-expressions), except that instead of using
+`.if`, `.andIf`, `.orIf`, instead they are added with `.filter`, `.andFilter`,
+and `.orFilter`.
+
+```ts
+query('foo').filter.attributeExists('data').orFilter('num', '<', 5)
+query('foo').where('=', 10).filter.not.contains({ path: 'set' }, { literal: 'a' })
+```
+
+A DynamoDB query can retrieve up to 1 MB of data. This limit is applied before
+any filters are applied. If not told otherwise, DDBJS will continue making 
+requests until the query is completed and then return the complete result.
+
+You can limit the maximum number of items matched by the query using the 
+`.limit` method. If you want to limit the number of consecutive requests made
+to DynamoDB, use the `.maxRequests` method. You can also limit the number of
+items per request using `.batchSize`. This is especially useful if you process
+the result using the async iterator.
+
+The result of the `query` has the following structure:
+
+```ts
+{
+  // the items the query matched
+  items: Item[],
+  // the key of the last evaluated item, if the query is paginated and more
+  // items are available. This key can be passed to `.from`, to continue the
+  // query after the last item
+  lastKey?: Key,
+  // the number of items returned
+  count: number,
+  // the number of items the query matched, before filters were applied
+  scannedCount: number,
+  // the number of requests that were sent to DynamoDB
+  requestCount: number
+}
+```
+
+You can also read the results using `for await...of`. If you do so more results
+are queried as needed (in batches of the size specified in `batchSize` or up to
+1 MB).
+
+```ts
+for await (const item of db.query('foo').maxRequests(10)) {}
+
+for await (const item of db.query('bar').batchSize(5).limit(250)) {
+  if (someCondition(item)) break
+}
+```
+
 ## Condition Expressions
 
 The `put`, `update`, and `delete` operations can all include [condition expressions](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.ConditionExpressions.html).
@@ -308,7 +395,8 @@ db
   .returning('UPDATED_NEW')
   .if('num', '>=', 'map.count')
   .andIf(v =>
-      v.if.attributeNotExists('data').orIf.not('data', 'in', 'a', 'b', 'c')
+      v.if.attributeNotExists('data')
+       .orIf.not('data', 'in', 'a', 'b', 'c')
   ).expr
 ```
 
@@ -424,7 +512,8 @@ db
 db
   .query('key')
   .filter({ size: 'data' }, '<>', 4)
-  .andFilter.not({ path: 'data_' }, 'in', 'foo', 'baz')
+  .andFilter
+  .not({ path: 'data_' }, 'in', 'foo', 'baz')
   .expr
 ```
   

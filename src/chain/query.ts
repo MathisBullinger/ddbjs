@@ -28,10 +28,10 @@ export class Query<
 > extends ConditionChain<
   QueryResult<ScFields<T>>,
   QueryConfig<T> & { verb: 'filter' },
-  { limit: true }
+  { limit: true; strong: true }
 > {
   constructor(config: QueryConfig<T>) {
-    super({ ...config, verb: 'filter' }, { limit: true })
+    super({ ...config, verb: 'filter' }, { limit: true, strong: true })
   }
 
   async execute() {

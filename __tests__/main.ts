@@ -949,6 +949,24 @@ test('query pagination & iteration', async () => {
     for await (const item of dbComp.query(pk).maxRequests(2)) results.push(item)
     expect(results.length).toBeLessThan(items.length)
   }
+
+  {
+    let key: any = null
+    const results: any[] = []
+    let count = 0
+
+    do {
+      count++
+      let query = dbComp.query(pk).limit(6)
+      if (key) query = query.from(key)
+      const res = await query
+      results.push(...res.items)
+      key = res.lastKey
+    } while (key)
+
+    expect(results.length).toBe(items.length)
+    expect(count).toBe(Math.ceil(100 / 6))
+  }
 })
 
 test('query filter', async () => {
