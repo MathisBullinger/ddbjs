@@ -18,11 +18,11 @@ export class Put<
   R extends ReturnType
 > extends ConditionChain<
   R extends 'NONE' ? undefined : ScItem<T>,
-  PutConfig<T, R>,
+  PutConfig<T, R> & { verb: 'if' },
   { cast: true }
 > {
   constructor(config: PutConfig<T, R>) {
-    super(config, { cast: true })
+    super({ ...config, verb: 'if' }, { cast: true })
   }
 
   async execute() {

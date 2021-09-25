@@ -25,11 +25,11 @@ export class Update<
     : R extends 'OLD' | 'NEW'
     ? ScItem<T>
     : Partial<ScItem<T>>,
-  UpdateConfig<T, R>,
+  UpdateConfig<T, R> & { verb: 'if' },
   { cast: true }
 > {
   constructor(config: UpdateConfig<T, R>) {
-    super(config, { cast: true })
+    super({ ...config, verb: 'if' }, { cast: true })
   }
 
   async execute() {

@@ -836,6 +836,11 @@ test('nested condition operand', async () => {
 
 // query
 
+const expectLength = async (prom: any, length: number) => {
+  const { items } = await prom
+  expect(items.length).toBe(length)
+}
+
 test('query', async () => {
   {
     const id = ranId()
@@ -847,11 +852,6 @@ test('query', async () => {
     const pk = ranId()
     const sks = ['a', 'b', 'foo', 'bar']
     await dbComp.batchPut(...sks.map(sk => ({ pk, sk })))
-
-    const expectLength = async (prom: any, length: number) => {
-      const { items } = await prom
-      expect(items.length).toBe(length)
-    }
 
     await expectLength(dbComp.query(pk), sks.length)
 
@@ -908,6 +908,13 @@ test('query pagination & iteration', async () => {
     expect(items.length).toBe(items.length)
   }
 
+  // FIXME: exclude [DDBKey] from type
+  // {
+  //   const res = await dbComp.query(pk)
+  //   // @ts-expect-error
+  //   type key = typeof res.items[0][typeof DDBKey]
+  // }
+
   {
     const { count, requestCount } = await dbComp
       .query(pk)
@@ -942,6 +949,42 @@ test('query pagination & iteration', async () => {
     for await (const item of dbComp.query(pk).maxRequests(2)) results.push(item)
     expect(results.length).toBeLessThan(items.length)
   }
+})
+
+test('query filter', async () => {
+  const pk = ranId()
+  const items = ['foo', 'bar', 'baz', 'asdf'].map(sk => ({
+    pk,
+    sk,
+    data: sk,
+    data_: sk,
+  }))
+  await dbComp.batchPut(...items)
+
+  await expectLength(dbComp.query(pk), 4)
+  await expectLength(dbComp.query(pk).filter('data', '=', 'foo'), 1)
+  await expectLength(dbComp.query(pk).filter({ path: 'data' }, '=', 'foo'), 1)
+  await expectLength(
+    dbComp.query(pk).filter({ literal: 'data' }, '=', 'foo'),
+    0
+  )
+  await expectLength(dbComp.query(pk).filter({ size: 'data' }, '<', 4), 3)
+  await expectLength(
+    dbComp.query(pk).filter({ size: { path: 'data' } }, '<', 4),
+    3
+  )
+  await expectLength(
+    dbComp.query(pk).filter({ size: { literal: 'data' } }, '<', 4),
+    0
+  )
+  await expectLength(dbComp.query(pk).filter.contains('data', 'f'), 2)
+  await expectLength(
+    dbComp
+      .query(pk)
+      .filter({ size: 'data' }, '<>', 4)
+      .andFilter.not({ path: 'data_' }, 'in', 'foo', 'baz'),
+    1
+  )
 })
 
 // misc

@@ -2,8 +2,9 @@ import BaseChain, { Config, UtilFlags } from './base'
 import * as expr from '../expression'
 import partial from 'snatchblock/partial'
 import oneOf from 'snatchblock/oneOf'
-import type { Fields, AttributeType, KeyPath, ScFields } from '../types'
+import type { Fields, AttributeType, KeyPath, ScFields, Schema } from '../types'
 import type { λ } from 'snatchblock/types'
+import { capitalize, uncapitalize } from 'snatchblock/string'
 
 type CondArgs<T extends Fields, U> =
   | [a: Operand<T>, comparator: Comparator, b: Operand<T>]
@@ -13,10 +14,11 @@ type CondArgs<T extends Fields, U> =
 
 type Comparator = '=' | '<>' | '<' | '<=' | '>' | '>='
 
-type Operand<T extends Fields> =
+type Operand<T extends Fields> = Operand_<T> | { size: Operand_<T> }
+
+type Operand_<T extends Fields> =
   | KeyPath<T>
   | Literal
-  | { size: KeyPath<T> }
   | { literal: Literal }
   | { path: string }
 
@@ -31,10 +33,10 @@ const isComp = <T extends Fields, U>(
 ): args is [a: Operand<T>, comparator: Comparator, b: Operand<T>] =>
   args.length === 3
 
-type AddCond<R, T extends Config<any>, U> = ((
+type AddCond<R, T extends CondConf<any, any>, U> = ((
   ...args: CondArgs<F<T>, ConditionChain<R, T, U>>
 ) => ConditionChain<R, T, U>) & { not: AddCond<R, T, U> } & MapReturn<
-    ConditionChain<R, T, U>['functions_'],
+    ConditionChain_<R, T, U>['functions_'],
     ConditionChain<R, T, U>
   >
 
@@ -44,9 +46,21 @@ type MapReturn<T extends Record<string, λ>, R> = {
 
 type F<T extends Config<any>> = ScFields<T['schema']>
 
-export default abstract class ConditionChain<
+type CondConf<T extends Schema<any>, V extends 'if' | 'filter'> = Config<T> & {
+  verb: V
+}
+
+type CondExpr<T extends CondConf<any, any>> = T extends CondConf<any, infer V>
+  ? V extends 'if'
+    ? expr.ConditionExpression
+    : V extends 'filter'
+    ? expr.FilterExpression
+    : never
+  : never
+
+abstract class ConditionChain_<
   R,
-  C extends Config<any>,
+  C extends CondConf<any, any>,
   U extends UtilFlags
 > extends BaseChain<R, C, U> {
   constructor(config: C, flags: U) {
@@ -54,9 +68,21 @@ export default abstract class ConditionChain<
     this.onCloneHooks.push(chain => {
       chain.condition = this.cloneConditon()
     })
+
+    Object.assign(
+      this,
+      Object.fromEntries(
+        ['', 'and', 'or'].map(c => [
+          uncapitalize(c + capitalize(config.verb)),
+          this.conditionFactory(
+            partial(this.ifAndOr, c.toUpperCase() || 'AND')
+          )(),
+        ])
+      )
+    )
   }
 
-  private resolveOperand(op: Operand<F<C>>) {
+  private resolveOperand(op: Operand<F<C>>): string | Function {
     if (typeof op === 'object' && op !== null) {
       const key = Object.keys(op)[0]
       if (
@@ -68,11 +94,15 @@ export default abstract class ConditionChain<
       if (key === 'path') return this.name((op as any).path)
       if (key === 'literal') return this.value((op as any).literal)
       if (key === 'size')
-        return new Function('size', this.name((op as any).size))
+        return new Function(
+          'size',
+          this.resolveOperand((op as any).size) as string
+        )
     }
 
     if (typeof op === 'string' && op.split(/[\.\[]/)[0] in this.config.schema)
       return this.name(op)
+
     return this.value(op)
   }
 
@@ -84,10 +114,10 @@ export default abstract class ConditionChain<
       if (isCB(args)) {
         const cond = this.cloneConditon()
         delete this.condition
-        const chain = args[0](this)
+        const chain = args[0](this as any)
         chain.condition = wrap(chain.condition!)
         chain.addCondition(cond, con, true)
-        return chain as this
+        return chain as ConditionChain<R, C, U>
       }
       if (args[1] === 'between') {
         const [a, _, b, c] = args
@@ -165,10 +195,6 @@ export default abstract class ConditionChain<
   }
   private functions = new Map(Object.entries(this.functions_))
 
-  public if = this.conditionFactory(partial(this.ifAndOr, 'AND'))()
-  public andIf = this.conditionFactory(partial(this.ifAndOr, 'AND'))()
-  public orIf = this.conditionFactory(partial(this.ifAndOr, 'OR'))()
-
   private addCondition(
     cond: ConditionList | undefined,
     con: 'AND' | 'OR',
@@ -184,14 +210,20 @@ export default abstract class ConditionChain<
 
   protected condition?: ConditionList
 
-  protected buildCondition(): expr.ConditionExpression | undefined {
+  protected buildCondition(): CondExpr<C> | undefined {
     if (this.condition) {
       return {
         ExpressionAttributeNames: Object.fromEntries(this.attrNames.key),
         ExpressionAttributeValues: Object.fromEntries(this.attrValues.key),
-        ConditionExpression: this.serialize(this.condition),
-      }
+        [this.condName]: this.serialize(this.condition),
+      } as any
     }
+  }
+
+  private get condName() {
+    if (this.config.verb === 'if') return 'ConditionExpression'
+    if (this.config.verb === 'filter') return 'FilterExpression'
+    throw Error(`unknown condition verb: ${JSON.stringify(this.config.verb)}`)
   }
 
   private serialize(cond: ConditionList): string {
@@ -313,3 +345,21 @@ class Function extends Condition {
     return `${this.name}(${args.join(',')})`
   }
 }
+
+type ConditionChain<
+  R,
+  C extends CondConf<any, any>,
+  U extends UtilFlags
+> = ConditionChain_<R, C, U> &
+  (C extends CondConf<any, infer V>
+    ? { [K in V | `${'and' | 'or'}${Capitalize<V>}`]: AddCond<R, C, U> }
+    : never)
+
+export default ConditionChain_ as unknown as new <
+  R,
+  C extends CondConf<any, any>,
+  U extends UtilFlags
+>(
+  config: C,
+  flags: U
+) => ConditionChain<R, C, U>

@@ -48,6 +48,7 @@ export const dbComp = new DDB(
     [DDB.key]: ['pk', 'sk'],
     pk: String,
     sk: String,
+    data: String,
   },
   opts
 )

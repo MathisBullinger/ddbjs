@@ -18,11 +18,11 @@ export class Delete<
   R extends ReturnType
 > extends ConditionChain<
   R extends 'NONE' ? undefined : ScItem<T>,
-  DelConfig<T, R>,
+  DelConfig<T, R> & { verb: 'if' },
   {}
 > {
   constructor(config: DelConfig<T, R>) {
-    super(config, {})
+    super({ ...config, verb: 'if' }, {})
   }
 
   async execute() {

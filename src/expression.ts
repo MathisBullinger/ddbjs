@@ -17,6 +17,10 @@ export interface ConditionExpression extends Expression {
   ConditionExpression: string
 }
 
+export interface FilterExpression extends Expression {
+  FilterExpression: string
+}
+
 const build = <T extends Expression>(expr: T): T => {
   const result = { ...expr }
   Object.entries(result).forEach(([k, v]) => {
@@ -118,6 +122,7 @@ export const merge = (
     | UpdateExpression
     | ProjectionExpression
     | ConditionExpression
+    | FilterExpression
     | undefined
   )[]
 ): Expression => {

@@ -1,7 +1,8 @@
-import BaseChain, { Config } from './base'
+import type { Config } from './base'
+import ConditionChain from './condition'
 import { camel } from 'snatchblock/string'
 import type { Slice, CamelCase } from 'snatchblock/types'
-import type { Schema, KeySym, Projected, ScFields, Field } from '../types'
+import type { Schema, KeySym, ScFields, Field } from '../types'
 
 type QueryConfig<T extends Schema<any>> = Config<T> & {
   key: any
@@ -24,9 +25,13 @@ export class Query<
       ? true
       : false
     : false
-> extends BaseChain<QueryResult<ScFields<T>>, QueryConfig<T>, { limit: true }> {
+> extends ConditionChain<
+  QueryResult<ScFields<T>>,
+  QueryConfig<T> & { verb: 'filter' },
+  { limit: true }
+> {
   constructor(config: QueryConfig<T>) {
-    super(config, { limit: true })
+    super({ ...config, verb: 'filter' }, { limit: true })
   }
 
   async execute() {
@@ -58,6 +63,12 @@ export class Query<
     return this.createInput({
       KeyConditionExpression,
       ...(this.config.limit !== undefined && { Limit: this.config.limit }),
+      ...Object.fromEntries(
+        Object.entries({
+          Limit: this.config.limit,
+          FilterExpression: this.buildCondition()?.FilterExpression,
+        }).filter(([_, v]) => v !== undefined)
+      ),
     })
   }
 
