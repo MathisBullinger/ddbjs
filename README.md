@@ -1,6 +1,6 @@
 # DynamoDB with a usable API.
 
-This library provides a friendlier API for DynamoDB.
+A query builder for DynamoDB with static schema typing.
 
 # Installation
 
@@ -136,6 +136,8 @@ await db.update('new_key', { name: 'foo' }).ifExists() // throws error
 await db.update(['hash', 'sort'], { data: '…' })
 ```
 
+## `query`
+
 ## Condition Expressions
 
 The `put`, `update`, and `delete` operations can all include [condition expressions](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/Expressions.ConditionExpressions.html).
@@ -218,4 +220,230 @@ conditions specified inside the callback will be grouped together.
 .if(foo).andIf(chain => chain.if(bar).orIf(baz))
 ```
 
+## Accessing the Document Client expression
+
+For any DDBJS query you can access the parameters that are passed to the 
+document client by reading the `expr` property. Some examples:
+
+---
+
+```ts
+const db = new DDB('example', {
+  [DDB.key]: 'key',
+  key: String,
+  data: String,
+  num: Number,
+  str: String,
+  map: { set: [String], count: Number },
+})
+```
+
+<table>
+<tr>
+  <td>DDBJS</td>
+  <td>Document Client</td>
+</tr>
+<tr>
+<td>
+  
+```js
+db
+  .get('foo')
+  .expr
+```
+  
+</td>
+<td>
+
+```js
+{
+  Key: { key: 'foo' },
+  TableName: 'example'
+}
+```
+
+</td>
+</tr>
+<tr>
+<td>
+
+```js
+db
+  .batchGet('foo', 'bar', 'baz')
+  .select('num')
+  .strong()
+  .expr
+```
+
+</td>
+<td>
+
+```js
+[{
+  RequestItems: {
+    example: {
+      ConsistentRead: true,
+      ProjectionExpression: 'num',
+      Keys: [
+        { key: 'foo' },
+        { key: 'bar' },
+        { key: 'baz' }
+      ]
+    }
+  }
+}]
+```
+
+</td>
+</tr>
+<tr>
+<td>
+
+```js
+db
+  .update('foo', { data: 'hello' })
+  .remove('num', 'str')
+  .delete({ 'map.set': ['a'] })
+  .add({ count: 5, 'map.set': ['b'] })
+  .returning('UPDATED_NEW')
+  .if('num', '>=', 'map.count')
+  .andIf(v =>
+      v.if.attributeNotExists('data').orIf.not('data', 'in', 'a', 'b', 'c')
+  ).expr
+```
+
+</td>
+<td>
+
+```js
+{
+  TableName: 'example',
+  Key: { key: 'foo' },
+  ReturnValues: 'UPDATED_NEW',
+  UpdateExpression: 'SET #s0=:s0 REMOVE num, str ADD #a0 :a0, #a1.#a2 :a1 DELETE #d0.#d1 :d0',
+  ConditionExpression: '(num >= #n0.#n1) AND ((attribute_not_exists(#n2)) OR (NOT (#n2 IN (:v0,:v1,:v2))))',
+  ExpressionAttributeValues: {
+    ':s0': 'hello',
+    ':a0': 5,
+    ':a1': Set { wrapperName: 'Set', values: ['b'], type: 'String' },
+    ':d0': Set { wrapperName: 'Set', values: ['a'], type: 'String' },
+    ':v0': 'a',
+    ':v1': 'b',
+    ':v2': 'c'
+  },
+  ExpressionAttributeNames: {
+    '#s0': 'data',
+    '#a0': 'count',
+    '#a1': 'map',
+    '#a2': 'set',
+    '#d0': 'map',
+    '#d1': 'set',
+    '#n0': 'map',
+    '#n1': 'count',
+    '#n2': 'data'
+  }
+}
+```
+
+</td>
+</tr>
+</table>
+
+---
+
+```ts
+const db = new DDB('example', {
+  [DDB.key]: ['pk', 'sk'],
+  pk: String,
+  sk: String,
+  data: String
+})
+```
+
+<table>
+<tr>
+  <td>DDBJS</td>
+  <td>Document Client</td>
+</tr>
+<tr>
+<td>
+
+```js
+db
+  .put({ pk: 'foo', sk: 'bar', count: 1 })
+  .ifNotExists()
+  .expr
+```
+
+</td>
+<td>
+
+```js
+{
+  Item: { pk: 'foo', sk: 'bar', count: 1 },
+  ConditionExpression: '(pk <> :v0) AND (sk <> :v1)',
+  ExpressionAttributeValues: { ':v0': 'foo', ':v1': 'bar' },
+  TableName: 'example'
+}
+```
+
+</td>
+</tr>
+<tr>
+<td>
+
+```js
+db
+  .update(['foo', 'bar'])
+  .add({ count: 1 })
+  .ifExists()
+  .expr
+```
+
+</td>
+<td>
+
+```js
+{
+  Key: { pk: 'foo', sk: 'bar' },
+  UpdateExpression: 'ADD #a0 :a0',
+  ExpressionAttributeValues: { ':a0': 1, ':v0': 'foo', ':v1': 'bar' },
+  ExpressionAttributeNames: { '#a0': 'count' },
+  ReturnValues: 'NONE',
+  ConditionExpression: '(pk = :v0) AND (sk = :v1)',
+  TableName: 'example'
+}
+```
+
+</td>
+</tr>
+<tr>
+<td>
+  
+```js
+db
+  .query('key')
+  .filter({ size: 'data' }, '<>', 4)
+  .andFilter.not({ path: 'data_' }, 'in', 'foo', 'baz')
+  .expr
+```
+  
+</td>
+<td>
+
+```js
+{
+  KeyConditionExpression: 'pk=:v3',
+  FilterExpression: '(size(#n0) <> :v0) AND (NOT (data_ IN (:v1,:v2)))',
+  ExpressionAttributeNames: { '#n0': 'data' },
+  ExpressionAttributeValues: { ':v0': 4, ':v1': 'foo', ':v2': 'baz', ':v3': 'key' },
+  TableName: 'example'
+}
+```
+
+</td>
+</tr>
+</table>
+
+---
 

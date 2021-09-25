@@ -18,7 +18,7 @@ export type Config<T extends Schema<any>> = {
   batchSize?: number
 }
 
-export type UtilFlags = { cast?: boolean; limit?: boolean }
+export type UtilFlags = { cast?: boolean; limit?: boolean; strong?: boolean }
 
 export default abstract class BaseChain<
   TResult,
@@ -115,6 +115,7 @@ export default abstract class BaseChain<
       ...(this.attrValues.size && {
         ExpressionAttributeValues: Object.fromEntries(this.attrValues.key),
       }),
+      ...(this.config.strong && { ConsistentRead: true }),
     } as any
   }
 
@@ -193,6 +194,10 @@ export default abstract class BaseChain<
     'limit',
     (size: number) => this.clone({ batchSize: size } as Partial<TConfig>),
     'batchSize'
+  )
+
+  public strong = this.flag('strong', () =>
+    this.clone({ strong: true } as Partial<TConfig>)
   )
 
   protected clone(diff: Partial<TConfig> = {}): this {

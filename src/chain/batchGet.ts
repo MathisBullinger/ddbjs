@@ -14,9 +14,13 @@ type BatchGetConfig<T extends Schema<any>> = Config<T> & {
 export class BatchGet<
   T extends Schema<any>,
   S extends string | number | symbol = Field<T>
-> extends BaseChain<Projected<ScFields<T>, S>[], BatchGetConfig<T>> {
+> extends BaseChain<
+  Projected<ScFields<T>, S>[],
+  BatchGetConfig<T>,
+  { strong: true }
+> {
   constructor(config: BatchGetConfig<T>) {
-    super(config, {})
+    super(config, { strong: true })
   }
 
   async execute() {
@@ -30,7 +34,8 @@ export class BatchGet<
   }
 
   public get expr(): AWS.DynamoDB.BatchGetItemInput[] {
-    const params = expr.project(...(this.config.selection ?? []))
+    const params: any = expr.project(...(this.config.selection ?? []))
+    if (this.config.strong) params.ConsistentRead = true
     return batch(this.config.keys, 100).map(Keys => ({
       RequestItems: {
         [this.config.table]: {
