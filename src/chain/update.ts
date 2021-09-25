@@ -3,7 +3,8 @@ import ConditionChain from './condition'
 import * as expr from '../expression'
 import { decode } from '../utils/convert'
 import type { Schema, UpdateInput, ScItem } from '../types'
-import { mapValues, clone } from '../utils/object'
+import { mapValues } from '../utils/object'
+import clone from 'snatchblock/clone'
 
 type ReturnType = 'NONE' | 'OLD' | 'NEW' | 'UPDATED_OLD' | 'UPDATED_NEW'
 
@@ -33,6 +34,18 @@ export class Update<
   }
 
   async execute() {
+    const params = this.expr
+    if (!this.isComplete(params)) throw Error('incomplete update')
+    this.log('update', params)
+
+    const { Attributes } = await this.config.client.update(params).promise()
+    const result = decode(
+      this.config.return === 'NONE' ? undefined : Attributes
+    )
+    this.resolve(result as any)
+  }
+
+  public get expr(): AWS.DynamoDB.DocumentClient.UpdateItemInput {
     const params: Partial<AWS.DynamoDB.DocumentClient.UpdateItemInput> = {
       TableName: this.config.table,
       Key: this.config.key,
@@ -65,15 +78,7 @@ export class Update<
       : this.config.return
 
     Object.assign(params, expr.merge(params as any, this.buildCondition()))
-
-    if (!this.isComplete(params)) throw Error('incomplete update')
-
-    super.log('update', params)
-    const { Attributes } = await this.config.client.update(params).promise()
-    const result = decode(
-      this.config.return === 'NONE' ? undefined : Attributes
-    )
-    this.resolve(result as any)
+    return params as any
   }
 
   remove(...fields: string[]) {

@@ -26,7 +26,17 @@ export class Delete<
   }
 
   async execute() {
-    const params: AWS.DynamoDB.DeleteItemInput = {
+    const params = this.expr
+    this.log('delete', params)
+
+    const { Attributes } = await this.config.client.delete(params).promise()
+
+    const result = decode(this.config.return === 'OLD' ? Attributes : undefined)
+    this.resolve(result as any)
+  }
+
+  public get expr(): AWS.DynamoDB.DeleteItemInput {
+    const params: any = {
       TableName: this.config.table,
       Key: this.config.key,
       ...(this.config.return === 'OLD' && {
@@ -34,12 +44,7 @@ export class Delete<
       }),
     }
     Object.assign(params, expr.merge(params as any, this.buildCondition()))
-    super.log('delete', params)
-
-    const { Attributes } = await this.config.client.delete(params).promise()
-
-    const result = decode(this.config.return === 'OLD' ? Attributes : undefined)
-    this.resolve(result as any)
+    return params
   }
 
   returning<R extends ReturnType>(v: R): Delete<T, R> {

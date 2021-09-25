@@ -3,6 +3,7 @@ import { decode } from '../utils/convert'
 import * as expr from '../expression'
 import { batch } from '../utils/array'
 import type { Schema, Fields, ScFields, Projected, Field } from '../types'
+import omit from 'snatchblock/omit'
 
 type BatchGetConfig<T extends Schema<any>> = Config<T> & {
   keys: any[]
@@ -19,15 +20,7 @@ export class BatchGet<
   }
 
   async execute() {
-    const selected = [...(this.config.selection ?? [])]
-
-    const params = expr.project(...selected)
-
-    const items = (
-      await Promise.all(
-        batch(this.config.keys, 100).map(v => this.read(v, params as any))
-      )
-    ).flat()
+    const items = (await Promise.all(this.expr.map(v => this.read(v)))).flat()
 
     this.resolve(
       this.removeKeys(
@@ -36,35 +29,44 @@ export class BatchGet<
     )
   }
 
-  public select<Fields extends string>(
-    ...fields: Fields[]
-  ): BatchGet<T, Fields> {
-    return this.clone({ selection: fields }) as any
-  }
-
-  private async read(
-    Keys?: any[],
-    params?: Partial<AWS.DynamoDB.BatchGetItemInput>
-  ): Promise<any[]> {
-    if (!Keys?.length) return []
-
-    const payload = {
+  public get expr(): AWS.DynamoDB.BatchGetItemInput[] {
+    const params = expr.project(...(this.config.selection ?? []))
+    return batch(this.config.keys, 100).map(Keys => ({
       RequestItems: {
         [this.config.table]: {
           Keys,
           ...params,
         },
       },
-    }
-    super.log('batchGet', payload)
+    }))
+  }
+
+  public select<Fields extends string>(
+    ...fields: Fields[]
+  ): BatchGet<T, Fields> {
+    return this.clone({ selection: fields }) as any
+  }
+
+  private async read(params: AWS.DynamoDB.BatchGetItemInput): Promise<any[]> {
+    const keys = params.RequestItems[this.config.table].Keys
+    if (!keys.length) return []
+
+    this.log('batchGet', params)
 
     const { Responses, UnprocessedKeys } = await this.config.client
-      .batchGet(payload)
+      .batchGet(params)
       .promise()
 
     return [
       ...(Responses?.[this.config.table] ?? []),
-      ...(await this.read(UnprocessedKeys?.[this.config.table]?.Keys)),
+      ...(await this.read({
+        ...omit(params, 'RequestItems'),
+        RequestItems: {
+          [this.config.table]: {
+            Keys: UnprocessedKeys?.[this.config.table]?.Keys ?? [],
+          },
+        },
+      })),
     ]
   }
 

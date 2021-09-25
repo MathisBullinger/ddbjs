@@ -40,7 +40,7 @@ export class Query<
 
   [Symbol.asyncIterator] = this.batchIter<ScFields<T>>('query')
 
-  protected params(): AWS.DynamoDB.QueryInput {
+  public get expr(): AWS.DynamoDB.QueryInput {
     let KeyConditionExpression = `${this.name(this.pk)}=${this.value(
       this.config.key
     )}`

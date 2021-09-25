@@ -14,20 +14,18 @@ export class BatchDelete<T extends Schema<any>> extends BaseChain<
 
   async execute() {
     await Promise.all(
-      batch(this.config.keys, 25).map(batch => this.delete(batch))
+      this.expr.map(v => this.config.client.batchWrite(v).promise())
     )
     this.resolve(undefined as any)
   }
 
-  private async delete(keys: any[]) {
-    await this.config.client
-      .batchWrite({
-        RequestItems: {
-          [this.config.table]: keys.map(Key => ({
-            DeleteRequest: { Key },
-          })),
-        },
-      })
-      .promise()
+  public get expr(): AWS.DynamoDB.BatchWriteItemInput[] {
+    return batch(this.config.keys, 25).map(keys => ({
+      RequestItems: {
+        [this.config.table]: keys.map(Key => ({
+          DeleteRequest: { Key },
+        })),
+      },
+    }))
   }
 }

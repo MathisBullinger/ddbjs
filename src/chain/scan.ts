@@ -17,7 +17,7 @@ export class Scan<
 
   [Symbol.asyncIterator] = this.batchIter<ScFields<T>>('scan')
 
-  protected params(): AWS.DynamoDB.ScanInput {
+  public get expr(): AWS.DynamoDB.ScanInput {
     const params = {
       TableName: this.config.table,
       Limit: this.config.limit,

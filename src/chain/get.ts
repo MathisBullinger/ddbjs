@@ -17,14 +17,18 @@ export class Get<
   }
 
   async execute() {
-    const params = this.createInput({
-      Key: this.config.key,
-      ConsistentRead: this.config.consistent ?? false,
-    })
-    super.log('get', params)
+    const params = this.expr
+    this.log('get', params)
     Object.assign(params, expr.project(...(this.config.selection ?? [])))
     const { Item } = await this.config.client.get(params as any).promise()
     this.resolve(decode(Item) as any)
+  }
+
+  public get expr(): AWS.DynamoDB.GetItemInput {
+    return this.createInput({
+      Key: this.config.key,
+      ConsistentRead: this.config.consistent ?? false,
+    })
   }
 
   public select<Fields extends string>(...fields: Fields[]): Get<T, Fields> {

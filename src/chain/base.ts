@@ -1,7 +1,7 @@
 import type { Schema, ExplTypes, KeySym, ScFields } from '../types'
-import { clone } from '../utils/object'
 import * as naming from '../utils/naming'
 import { decode } from '../utils/convert'
+import clone from 'snatchblock/clone'
 import BiMap from 'snatchblock/bimap'
 import callAll from 'snatchblock/callAll'
 import pick from 'snatchblock/pick'
@@ -65,7 +65,7 @@ export default abstract class BaseChain<
   }
 
   protected abstract execute(): Promise<void>
-  protected params?(): any
+  public abstract get expr(): any
 
   public debug(): this {
     return this.clone({ debug: true } as Partial<TConfig>)
@@ -243,7 +243,7 @@ export default abstract class BaseChain<
   protected batchIter = <T = any>(
     op: 'scan' | 'query',
     getParams: () => Parameters<AWS.DynamoDB.DocumentClient['query']>[0] = () =>
-      this.params?.(),
+      this.expr,
     config: Config<any> = this.config
   ) =>
     async function* (

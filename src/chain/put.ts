@@ -26,15 +26,8 @@ export class Put<
   }
 
   async execute() {
-    const params: AWS.DynamoDB.DocumentClient.PutItemInput = {
-      TableName: this.config.table,
-      Item: this.makeSets(this.config.item),
-      ...(this.config.return === 'OLD' && { ReturnValues: 'ALL_OLD' }),
-    }
-
-    Object.assign(params, expr.merge(params as any, this.buildCondition()))
-    super.log('put', params)
-
+    const params = this.expr
+    this.log('put', params)
     const { Attributes } = await this.config.client.put(params).promise()
 
     const result = decode(
@@ -45,6 +38,16 @@ export class Put<
         : undefined
     )
     this.resolve(result as any)
+  }
+
+  public get expr(): AWS.DynamoDB.DocumentClient.PutItemInput {
+    const params = {
+      TableName: this.config.table,
+      Item: this.makeSets(this.config.item),
+      ...(this.config.return === 'OLD' && { ReturnValues: 'ALL_OLD' }),
+    }
+    Object.assign(params, expr.merge(params as any, this.buildCondition()))
+    return params
   }
 
   returning<R extends ReturnType>(v: R): Put<T, R> {
