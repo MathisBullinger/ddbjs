@@ -908,12 +908,11 @@ test('query pagination & iteration', async () => {
     expect(items.length).toBe(items.length)
   }
 
-  // FIXME: exclude [DDBKey] from type
-  // {
-  //   const res = await dbComp.query(pk)
-  //   // @ts-expect-error
-  //   type key = typeof res.items[0][typeof DDBKey]
-  // }
+  {
+    const res = await dbComp.query(pk)
+    // @ts-expect-error
+    type key = typeof res.items[0][typeof DDBKey]
+  }
 
   {
     const { count, requestCount } = await dbComp

@@ -2,7 +2,7 @@ import type { Config } from './base'
 import ConditionChain from './condition'
 import { camel } from 'snatchblock/string'
 import type { Slice, CamelCase } from 'snatchblock/types'
-import type { Schema, KeySym, ScFields, Field } from '../types'
+import type { Schema, KeySym, ScFields, Projected, Field } from '../types'
 
 type QueryConfig<T extends Schema<any>> = Config<T> & {
   key: any
@@ -26,7 +26,7 @@ export class Query<
       : false
     : false
 > extends ConditionChain<
-  QueryResult<ScFields<T>>,
+  QueryResult<Projected<ScFields<T>, S>>,
   QueryConfig<T> & { verb: 'filter' },
   { limit: true; strong: true }
 > {
@@ -105,9 +105,6 @@ type KeyFilterArgs<T extends KeyFilterOp = any, K = unknown> = [
 
 type KeyFilterBuilder<R> = (<T extends KeyFilterOp, K>(
   ...args: KeyFilterArgs<T, K>
-) => R) &
-  {
-    [K in KeyFilterOp as CamelCase<K>]: (
-      ...args: Slice<KeyFilterArgs<K>, 1>
-    ) => R
-  }
+) => R) & {
+  [K in KeyFilterOp as CamelCase<K>]: (...args: Slice<KeyFilterArgs<K>, 1>) => R
+}
