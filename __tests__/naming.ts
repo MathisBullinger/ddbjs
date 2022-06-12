@@ -21,7 +21,7 @@ test(`exceed ${byteLimit} bytes limit`, async () => {
   ).rejects.toThrow()
 })
 
-test('reserved keywords', async () => {
+test.skip('reserved keywords', async () => {
   const html = await new Promise<string>(resolve =>
     https.get(
       'https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/ReservedWords.html',
