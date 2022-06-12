@@ -3,7 +3,7 @@ import { decode } from '../utils/convert'
 import * as expr from '../expression'
 import { batch } from '../utils/array'
 import type { Schema, Fields, ScFields, Projected, Field } from '../types'
-import omit from 'snatchblock/omit'
+import omit from 'froebel/omit'
 
 type BatchGetConfig<T extends Schema<any>> = Config<T> & {
   keys: any[]

@@ -1,10 +1,10 @@
 import BaseChain, { Config, UtilFlags } from './base'
 import * as expr from '../expression'
-import partial from 'snatchblock/partial'
-import oneOf from 'snatchblock/oneOf'
+import partial from 'froebel/partial'
+import oneOf from 'froebel/oneOf'
 import type { Fields, AttributeType, KeyPath, ScFields, Schema } from '../types'
-import type { λ } from 'snatchblock/types'
-import { capitalize, uncapitalize } from 'snatchblock/string'
+import type { λ } from 'froebel/types'
+import { capitalize, uncapitalize } from 'froebel/string'
 
 type CondArgs<T extends Fields, U> =
   | [a: Operand<T>, comparator: Comparator, b: Operand<T>]

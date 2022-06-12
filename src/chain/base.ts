@@ -1,10 +1,10 @@
 import type { Schema, ExplTypes, KeySym, ScFields } from '../types'
 import * as naming from '../utils/naming'
 import { decode } from '../utils/convert'
-import clone from 'snatchblock/clone'
-import BiMap from 'snatchblock/bimap'
-import callAll from 'snatchblock/callAll'
-import pick from 'snatchblock/pick'
+import clone from 'froebel/clone'
+import BiMap from 'froebel/bimap'
+import callAll from 'froebel/callAll'
+import pick from 'froebel/pick'
 
 export type Config<T extends Schema<any>> = {
   schema: T

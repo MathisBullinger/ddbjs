@@ -1,6 +1,6 @@
 import * as AWS from 'aws-sdk'
 import * as chain from './chain'
-import omit from 'snatchblock/omit'
+import omit from 'froebel/omit'
 import type {
   Schema,
   Fields,

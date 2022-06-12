@@ -1,8 +1,8 @@
 import BaseChain, { Config } from './base'
 import { batch } from '../utils/array'
 import type { Schema, ScItem } from '../types'
-import clone from 'snatchblock/clone'
-import { omit } from 'snatchblock'
+import clone from 'froebel/clone'
+import omit from 'froebel/omit'
 
 type BatchPutConfig<T extends Schema<any>> = Config<T> & { items: ScItem<T>[] }
 

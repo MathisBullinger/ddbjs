@@ -40,14 +40,14 @@ export type CompositeKey<
 export type SchemaValue<T extends SchemaValueType> =
   T extends PrimitiveConstructor
     ? PrimitiveConstructorType<T>
-    : T extends []
+    : T extends { length: 0 }
     ? any[]
-    : T extends any[]
-    ? PrimitiveConstructorType<T[number]>[]
+    : T extends [infer I]
+    ? PrimitiveConstructorType<I extends PrimitiveConstructor ? I : never>[]
+    : T extends Fields
+    ? { [K in keyof T]?: SchemaValue<T[K]> }
     : T extends ObjectConstructor
     ? any
-    : T extends Fields
-    ? Item<T, never>
     : never
 
 export type KeyValue<
@@ -76,8 +76,9 @@ export type Item<F extends Fields, R extends Key<F>> = PickRequired<
   KeyFields<F, R>
 >
 
-type PickRequired<T, K extends keyof T> = { [R in K]-?: T[R] } &
-  { [O in Exclude<keyof T, K>]?: T[O] }
+type PickRequired<T, K extends keyof T> = { [R in K]-?: T[R] } & {
+  [O in Exclude<keyof T, K>]?: T[O]
+}
 
 export type Projected<T extends Fields, S extends string | number | symbol> = {
   [K in S]: K extends keyof T ? SchemaValue<T[K]> : unknown
@@ -91,12 +92,14 @@ export type UpdateInput<
   remove?: string[]
   add?: Record<string, string[] | number[] | number>
   delete?: Record<string, string[] | number[]>
+  push?: Record<string, unknown[]>
 }
 
 type UpdateMap<T extends Fields> = Partial<
   {
-    [K in keyof T]?: { [K_ in K]: SchemaValue<T[K]> } &
-      (T[K] extends Fields ? MapPrefix<UpdateMap<T[K]>, K & string> : {})
+    [K in keyof T]?: { [K_ in K]: SchemaValue<T[K]> } & (T[K] extends Fields
+      ? MapPrefix<UpdateMap<T[K]>, K & string>
+      : {})
   }[keyof T]
 >
 
@@ -151,8 +154,7 @@ export type PrimitiveConstructorType<T extends PrimitiveConstructor> =
 
 export type ExplTypes<T extends Record<string, any>> = {
   [K in keyof T]?: 'Set' | 'List'
-} &
-  Record<string, 'Set' | 'List'>
+} & Record<string, 'Set' | 'List'>
 
 export type AttributeType =
   | 'S'

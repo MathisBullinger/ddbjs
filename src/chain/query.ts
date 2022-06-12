@@ -1,7 +1,7 @@
 import type { Config } from './base'
 import ConditionChain from './condition'
-import { camel } from 'snatchblock/string'
-import type { Slice, CamelCase } from 'snatchblock/types'
+import { camel } from 'froebel/string'
+import type { Slice, CamelCase } from 'froebel/types'
 import type { Schema, KeySym, ScFields, Projected, Field } from '../types'
 
 type QueryConfig<T extends Schema<any>> = Config<T> & {

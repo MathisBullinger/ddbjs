@@ -1,6 +1,6 @@
-import { ranId, db, dbComp, scanDB, scanDBComp } from './utils/db'
+import { db, dbComp, ranId, scanDB, scanDBComp } from './utils/db'
 import { DBRecord } from '../src/ddb'
-import pick from 'snatchblock/pick'
+import pick from 'froebel/pick'
 
 jest.setTimeout(20000)
 
@@ -18,7 +18,10 @@ test('get existing item', async () =>
 test('get select fields', async () => {
   const id = ranId()
   await db.put({ id, a: 'b', c: 'd', e: 'f', data: 'foo' })
-  await expect(db.get(id).select('a', 'c')).resolves.toEqual({ a: 'b', c: 'd' })
+  await expect(db.get(id).select('a', 'c')).resolves.toEqual({
+    a: 'b',
+    c: 'd',
+  })
   await expect(db.get(id).select('data')).resolves.toEqual({ data: 'foo' })
 
   const item = await db.get(id).select('data', 'foo')
@@ -100,8 +103,9 @@ test('batch get select fields', async () => {
 
   const pool = [...all]
   const shuffled = []
-  for (let i = 0; i < 150; i++)
+  for (let i = 0; i < 150; i++) {
     shuffled.push(pool.splice((Math.random() * pool.length) | 0, 1)[0])
+  }
 
   await expect(
     db.batchGet(...shuffled.map(({ id }) => id)).sort()
@@ -385,7 +389,9 @@ test('explicit Set', async () => {
     db.put({ id: 'expset', explset: ['a'] }).cast({ explset: 'Set' })
   ).resolves.not.toThrow()
   await expect(
-    db.update('expset', { explset: ['a', 'a'] } as any).cast({ explset: 'Set' })
+    db.update('expset', { explset: ['a', 'a'] } as any).cast({
+      explset: 'Set',
+    })
   ).rejects.toThrow()
 
   await expect(
@@ -424,20 +430,23 @@ test('nested cast', async () => {
 
 // list manipulation
 
-// test('list insert & delete', async () => {
-//   const obj = { id: ranId(), abc: ['a', 'b', 'x', 'd'] }
-//   await expect(db.put(obj).returning('NEW')).resolves.toEqual(obj)
-//   await expect(
-//     db.update(obj.id, { 'abc[2]': '_' }).returning('NEW')
-//   ).resolves.toEqual({ abc: ['a', 'b', '_', 'd'] })
-//   // await expect(
-//   //   db.update(obj.id).remove('abc[2]').returning('UPDATED_NEW')
-//   // ).resolves.toEqual({ abc: ['a', 'b', 'd'] })
-//   await expect(db.get(obj.id)).resolves.toEqual({
-//     id: obj.id,
-//     abc: ['a', 'b', 'd'],
-//   })
-// })
+test('add & remove from list', async () => {
+  const id = ranId()
+  await db.put({ id, list: ['a', 'c'] })
+
+  await expect(db.get(id)).resolves.toMatchObject({ list: ['a', 'c'] })
+
+  await db.update(id, { ['list[1]']: 'b' } as any)
+  await expect(db.get(id)).resolves.toMatchObject({ list: ['a', 'b'] })
+
+  await db.update(id).remove('list[1]')
+  await expect(db.get(id)).resolves.toMatchObject({ list: ['a'] })
+
+  await db.update(id).push({ list: ['b', 'c', 'd'] })
+  await expect(db.get(id)).resolves.toMatchObject({
+    list: ['a', 'b', 'c', 'd'],
+  })
+})
 
 // set manipulation
 
@@ -552,7 +561,7 @@ test('conditions', async () => {
     await db.put({ id, bool: true, num: 0 })
 
     await expect(
-      db.update(id, { num: 1 }).if('bool', '=', false).debug()
+      db.update(id, { num: 1 }).if('bool', '=', false)
     ).rejects.toThrow()
 
     await expect(
@@ -832,6 +841,8 @@ test('nested condition operand', async () => {
   //   // @ts-expect-error
   //   .if({ path: 'bool.str' }, '=', 'foo')
   //   .catch(() => {})
+
+  // await db.update(id).
 })
 
 // query
@@ -938,14 +949,17 @@ test('query pagination & iteration', async () => {
 
   {
     const results: any[] = []
-    for await (const item of dbComp.query(pk).limit(15).batchSize(5))
+    for await (const item of dbComp.query(pk).limit(15).batchSize(5)) {
       results.push(item)
+    }
     expect(results.length).toBe(15)
   }
 
   {
     const results: any[] = []
-    for await (const item of dbComp.query(pk).maxRequests(2)) results.push(item)
+    for await (const item of dbComp.query(pk).maxRequests(2)) {
+      results.push(item)
+    }
     expect(results.length).toBeLessThan(items.length)
   }
 

@@ -1,4 +1,5 @@
 import * as naming from './utils/naming'
+import surround from 'froebel/surround'
 
 export interface Expression {
   ExpressionAttributeValues?: Record<string, any>
@@ -30,6 +31,26 @@ const build = <T extends Expression>(expr: T): T => {
   return result
 }
 
+const escapeName = (
+  name: string,
+  prefix: string,
+  nameMap: Record<string, string>
+) => {
+  let key = ''
+  for (const part of naming.parts(name)) {
+    if (part.startsWith('[')) key += part
+    else {
+      let name = part
+      if (!naming.valid(part)) {
+        name = `#${prefix}${Object.keys(nameMap).length}`
+        nameMap[name] = part
+      }
+      key += key.length ? `.${name}` : name
+    }
+  }
+  return key
+}
+
 export const buildPairs = (
   input?: Record<string, any>,
   prefix = ''
@@ -44,16 +65,7 @@ export const buildPairs = (
     for (let i = 0; i < entries.length; i++) {
       const [key, value] = entries[i]
       const av = `:${prefix}${i}`
-      const name = naming.join(
-        ...naming.parts(key).map(v => {
-          if (v.startsWith('[') || naming.valid(v)) return v
-          const key = `#${prefix}${
-            Object.keys(ExpressionAttributeNames).length
-          }`
-          ExpressionAttributeNames[key] = v
-          return key
-        })
-      )
+      const name = escapeName(key, prefix, ExpressionAttributeNames)
       pairs.push([name, av, key])
       ExpressionAttributeValues[av] = value
     }
@@ -62,8 +74,18 @@ export const buildPairs = (
   return [{ ExpressionAttributeValues, ExpressionAttributeNames }, pairs]
 }
 
+export const fun = Symbol('function')
+
+type ExprOpts = {
+  prefix?: string
+  joiner?: string
+}
+
 const buildPairExpr =
-  <T = any>(verb: string, joiner = ' ', prefix = verb[0].toLowerCase()) =>
+  <T = any>(
+    verb: string,
+    { prefix = verb[0].toLowerCase(), joiner = ' ' }: ExprOpts = {}
+  ) =>
   (input?: Record<string, T>): UpdateExpression | undefined => {
     const [expr, pairs] = buildPairs(input, prefix)
 
@@ -71,12 +93,21 @@ const buildPairExpr =
     return build({
       ...expr,
       UpdateExpression: `${verb} ${pairs
-        .map(v => v.slice(0, 2).join(joiner))
+        .map(v => {
+          let [key, value] = v
+          const func = expr.ExpressionAttributeValues?.[value]?.[fun]
+          if (func) {
+            expr.ExpressionAttributeValues![value] =
+              expr.ExpressionAttributeValues![value].data
+            value = `${func}(${key}, ${value})`
+          }
+          return [key, value].join(joiner)
+        })
         .join(', ')}`,
     })
   }
 
-export const set = buildPairExpr('SET', '=')
+export const set = buildPairExpr('SET', { joiner: '=' })
 
 export const add = buildPairExpr('ADD')
 
@@ -98,14 +129,8 @@ const escape =
     const names: string[] = []
     const ExpressionAttributeNames: Expression['ExpressionAttributeNames'] = {}
 
-    for (const field of fields) {
-      if (naming.valid(field)) names.push(field)
-      else {
-        const name = `#${prefix}${Object.keys(ExpressionAttributeNames).length}`
-        names.push(name)
-        ExpressionAttributeNames[name] = field
-      }
-    }
+    for (const field of fields)
+      names.push(escapeName(field, prefix, ExpressionAttributeNames))
 
     return build({
       [field]: (verb ? `${verb} ` : '') + names.join(', '),

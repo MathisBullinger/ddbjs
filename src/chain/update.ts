@@ -4,7 +4,7 @@ import * as expr from '../expression'
 import { decode } from '../utils/convert'
 import type { Schema, UpdateInput, ScItem } from '../types'
 import { mapValues } from '../utils/object'
-import clone from 'snatchblock/clone'
+import clone from 'froebel/clone'
 
 type ReturnType = 'NONE' | 'OLD' | 'NEW' | 'UPDATED_OLD' | 'UPDATED_NEW'
 
@@ -56,7 +56,13 @@ export class Update<
     Object.assign(
       params,
       expr.merge(
-        expr.set(this.config.update.set as any),
+        expr.set({
+          ...this.config.update.set,
+          ...mapValues(this.config.update.push ?? {}, data => ({
+            data,
+            [expr.fun]: 'list_append',
+          })),
+        }),
         expr.remove(...(this.config.update.remove ?? [])),
         expr.add(
           this.config.update.add &&
@@ -96,6 +102,12 @@ export class Update<
   delete(fields: Exclude<Input<T>['delete'], null>) {
     const update = clone(this.config.update)
     update.delete = { ...update.delete, ...fields }
+    return this.clone({ update })
+  }
+
+  push(fields: Exclude<Input<T>['push'], null>) {
+    const update = clone(this.config.update)
+    update.push = { ...update.push, ...fields }
     return this.clone({ update })
   }
 

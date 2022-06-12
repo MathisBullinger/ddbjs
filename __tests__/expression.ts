@@ -5,6 +5,10 @@ test('set expr', () => {
     UpdateExpression: 'SET foo=:s0',
     ExpressionAttributeValues: { ':s0': 'bar' },
   })
+  expect(expr.set({ foo: 'bar', something: 2 })).toEqual({
+    UpdateExpression: 'SET foo=:s0, something=:s1',
+    ExpressionAttributeValues: { ':s0': 'bar', ':s1': 2 },
+  })
 })
 
 test('set reserved key', () => {
@@ -30,6 +34,10 @@ test('remove reserved key', () => {
     UpdateExpression: 'REMOVE #r0',
     ExpressionAttributeNames: { '#r0': 'data' },
   })
+  expect(expr.remove('data.foo')).toEqual({
+    UpdateExpression: 'REMOVE #r0.foo',
+    ExpressionAttributeNames: { '#r0': 'data' },
+  })
 })
 
 test('add expr', () => {
@@ -43,6 +51,23 @@ test('delete expr', () => {
   expect(expr.del({ nums: [1, 2] })).toEqual({
     UpdateExpression: 'DELETE nums :d0',
     ExpressionAttributeValues: { ':d0': [1, 2] },
+  })
+})
+
+test('push in expr', () => {
+  expect(
+    expr.set({ nums: { [expr.fun]: 'list_append', data: [1, 2] } })
+  ).toEqual({
+    UpdateExpression: 'SET nums=list_append(nums, :s0)',
+    ExpressionAttributeValues: { ':s0': [1, 2] },
+  })
+
+  expect(
+    expr.set({ list: { [expr.fun]: 'list_append', data: [1, 2] } })
+  ).toEqual({
+    UpdateExpression: 'SET #s0=list_append(#s0, :s0)',
+    ExpressionAttributeValues: { ':s0': [1, 2] },
+    ExpressionAttributeNames: { '#s0': 'list' },
   })
 })
 
